@@ -79,6 +79,7 @@ class ExtractRequest(BaseModel):
 
 
 class ExtractResponse(BaseModel):
+    run_id: int | None = None  # mã lần xử lý, gửi lại ở bước confirm
     ticket_id: str
     received_at: datetime
     llm_output: dict | None   # JSON GenAI trả về, giữ nguyên để người dùng xem
@@ -87,10 +88,24 @@ class ExtractResponse(BaseModel):
 
 
 class ConfirmRequest(BaseModel):
-    """POST /tickets/confirm: bản người dùng đã xem và sửa."""
+    """POST /tickets/confirm: bản người dùng đã xem và sửa.
 
-    received_at: AwareDatetime
+    Không nhận received_at từ trình duyệt: mã ticket và giờ nhận là dữ liệu
+    hệ thống, lấy lại từ lần extract (run_id) để người dùng không sửa được.
+    """
+
+    run_id: int
     ticket: TicketExtraction
+
+
+class ConfirmResponse(BaseModel):
+    ticket_id: str
+    severity: Severity
+    received_at: datetime
+    deadline_at: datetime
+    sla_minutes: int
+    edited_fields: list[str]  # các ô người dùng đã sửa so với GenAI
+    warnings: list[Issue]
 
 
 class QueueItem(BaseModel):
@@ -103,3 +118,8 @@ class QueueItem(BaseModel):
     received_at: datetime
     deadline_at: datetime
     reason: str
+
+
+class QueueResponse(BaseModel):
+    total: int               # tổng số ticket đang chờ
+    items: list[QueueItem]   # top K, xem không làm thay đổi hàng đợi

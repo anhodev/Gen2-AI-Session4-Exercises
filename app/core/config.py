@@ -19,6 +19,8 @@ class Settings:
     openai_model: str = "gpt-4o-mini"
     mock_llm: bool = True
     database_url: str = SQLITE_FALLBACK
+    frontend_origin: str = "http://localhost:3000"
+    app_timezone: str = "Asia/Ho_Chi_Minh"  # múi giờ hiển thị kết quả
 
     @property
     def use_mock(self) -> bool:
@@ -60,4 +62,6 @@ def get_settings() -> Settings:
         openai_model=os.getenv("OPENAI_MODEL", "gpt-4o-mini"),
         mock_llm=os.getenv("MOCK_LLM", "true").strip().lower() == "true",
         database_url=build_database_url(),
+        frontend_origin=os.getenv("FRONTEND_ORIGIN", "http://localhost:3000"),
+        app_timezone=os.getenv("APP_TIMEZONE", "Asia/Ho_Chi_Minh"),
     )

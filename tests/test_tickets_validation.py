@@ -124,4 +124,4 @@ def test_received_at_without_timezone_is_rejected():
 
 def test_confirm_request_rejects_bad_severity_from_user_edit():
     with pytest.raises(ValidationError):
-        ConfirmRequest(received_at="2026-10-21T09:00:00+07:00", ticket=good_output(severity="urgent"))
+        ConfirmRequest(run_id=1, ticket=good_output(severity="urgent"))

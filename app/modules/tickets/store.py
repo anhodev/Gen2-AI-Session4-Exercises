@@ -6,7 +6,7 @@ khi app khởi động lại, load_queue() đọc các ticket còn "queued" và 
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone, tzinfo
 
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
@@ -86,19 +86,22 @@ def reject(db: Session, run: Run | None, user_output: dict, reason: str) -> None
     raise DuplicateTicketError(reason)
 
 
-def load_queue(db: Session) -> TicketQueue:
+def load_queue(db: Session, tz: tzinfo = timezone.utc) -> TicketQueue:
     """
     Dựng lại heap từ các ticket còn trong hàng đợi.
 
     Args:
         db (Session): Database session.
+        tz (tzinfo, optional): Múi giờ hiển thị. Database trả về UTC,
+            đổi sang múi giờ này để lý do xếp hạng dễ đọc. Defaults to UTC.
 
     Returns:
         TicketQueue: Hàng đợi chứa mọi ticket có status="queued".
     """
     queue = TicketQueue()
     for row in db.scalars(select(Ticket).where(Ticket.status == "queued")):
-        queue.add(make_ticket(row.ticket_id, as_utc(row.received_at), row.severity, row.summary))
+        received_at = as_utc(row.received_at).astimezone(tz)
+        queue.add(make_ticket(row.ticket_id, received_at, row.severity, row.summary))
     return queue
 
 
