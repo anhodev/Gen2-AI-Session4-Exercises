@@ -39,6 +39,7 @@ def extract_structured(
     system_prompt: str,
     user_prompt: str,
     settings: Settings | None = None,
+    mock_vars: dict[str, str] | None = None,
 ) -> LLMResult:
     """
     Cho GenAI đọc văn bản và điền vào schema. Chưa có API key thì dùng mock.
@@ -49,13 +50,15 @@ def extract_structured(
         system_prompt (str): Hướng dẫn cho model.
         user_prompt (str): Nội dung cần đọc.
         settings (Settings | None, optional): Cấu hình. Defaults to get_settings().
+        mock_vars (dict[str, str] | None, optional): Chỉ dùng cho mock: giá trị thay vào
+            placeholder trong mẫu, ví dụ {"request_id": "R003"}. Defaults to None.
 
     Returns:
         LLMResult: JSON thô, tên model, thời gian xử lý và lỗi (nếu có).
     """
     settings = settings or get_settings()
     if settings.use_mock:
-        return call_mock(task, user_prompt)
+        return call_mock(task, user_prompt, mock_vars=mock_vars)
     return call_openai(schema, system_prompt, user_prompt, settings)
 
 
@@ -110,17 +113,20 @@ def raw_args_from_message(message: AIMessage) -> dict | None:
     return None
 
 
-def call_mock(task: str, user_prompt: str, samples_dir: Path = SAMPLES_DIR) -> LLMResult:
+def call_mock(task: str, user_prompt: str, samples_dir: Path = SAMPLES_DIR, mock_vars: dict[str, str] | None = None) -> LLMResult:
     """
     Trả JSON viết sẵn trong samples/<task>.json, không tốn tiền gọi model.
 
     Mỗi mẫu có "input" (văn bản gốc) và "llm_output" (JSON giả lập GenAI trả).
     Nếu nội dung gửi lên chứa đúng "input" của một mẫu thì trả mẫu đó.
+    Ô có giá trị "{tên}" (vd "{request_id}") được thay bằng mock_vars["tên"],
+    vì mã yêu cầu do backend sinh lúc chạy, không viết sẵn trong mẫu được.
 
     Args:
         task (str): Tên file mẫu.
         user_prompt (str): Nội dung cần đọc.
         samples_dir (Path, optional): Thư mục chứa mẫu. Defaults to SAMPLES_DIR.
+        mock_vars (dict[str, str] | None, optional): Giá trị thay vào placeholder.
 
     Returns:
         LLMResult: Kết quả giả lập, model="mock".
@@ -128,12 +134,23 @@ def call_mock(task: str, user_prompt: str, samples_dir: Path = SAMPLES_DIR) -> L
     prompt = normalize(user_prompt)
     for sample in load_samples(task, samples_dir):
         if normalize(sample["input"]) in prompt:
-            return LLMResult(sample["llm_output"], "mock", 0)
+            return LLMResult(fill_placeholders(sample["llm_output"], mock_vars or {}), "mock", 0)
 
     return LLMResult(
         None, "mock", 0,
         error="Chế độ mock chỉ đọc được nội dung mẫu. Hãy chọn một mẫu, hoặc đặt OPENAI_API_KEY và MOCK_LLM=false.",
     )
+
+
+def fill_placeholders(value, mock_vars: dict[str, str]):
+    """Thay các chuỗi dạng "{tên}" bằng mock_vars["tên"], đi sâu vào dict/list. Không sửa mẫu gốc."""
+    if isinstance(value, dict):
+        return {k: fill_placeholders(v, mock_vars) for k, v in value.items()}
+    if isinstance(value, list):
+        return [fill_placeholders(v, mock_vars) for v in value]
+    if isinstance(value, str) and value.startswith("{") and value.endswith("}"):
+        return mock_vars.get(value[1:-1], value)
+    return value
 
 
 def load_samples(task: str, samples_dir: Path = SAMPLES_DIR) -> list[dict]:

@@ -1,0 +1,122 @@
+[
+  {
+    "label": "R01 - Ví dụ trong đề (9 giờ, 60 phút)",
+    "note": "Lịch mẫu: A bận 09:00-11:00, B bận 09:30-10:15 -> gợi ý B 10:15-11:15",
+    "received_at": "2026-10-20T16:00:00+07:00",
+    "input": "Chào kho, xe của ACME Logistics đến từ 9 giờ sáng ngày 21/10, cần một tiếng để dỡ hàng.",
+    "expect_can_suggest": true,
+    "llm_output": {
+      "request_id": "{request_id}",
+      "carrier": "ACME Logistics",
+      "earliest_start": "2026-10-21T09:00:00",
+      "duration_minutes": 60,
+      "dock_type": "standard",
+      "missing_fields": []
+    }
+  },
+  {
+    "label": "Thiếu thời lượng",
+    "note": "Email không nói cần bao lâu -> duration_minutes = null, phải hỏi lại, không đoán từ 12 pallet",
+    "received_at": "2026-10-20T16:00:00+07:00",
+    "input": "Bên Sao Mai Express giao 12 pallet nước ngọt, xe đến từ 13 giờ ngày 21/10. Nhờ kho xếp cửa giúp.",
+    "expect_can_suggest": false,
+    "llm_output": {
+      "request_id": "{request_id}",
+      "carrier": "Sao Mai Express",
+      "earliest_start": "2026-10-21T13:00:00",
+      "duration_minutes": null,
+      "dock_type": "standard",
+      "missing_fields": ["duration_minutes"]
+    }
+  },
+  {
+    "label": "Cần cửa lạnh",
+    "note": "Hàng đông lạnh -> dock_type = refrigerated, chỉ xét cửa lạnh",
+    "received_at": "2026-10-20T16:00:00+07:00",
+    "input": "Xe lạnh của Fresh Cold Chain chở rau củ đông lạnh, đến khoảng 10h30 ngày 21/10, dỡ hàng mất 45 phút.",
+    "expect_can_suggest": true,
+    "llm_output": {
+      "request_id": "{request_id}",
+      "carrier": "Fresh Cold Chain",
+      "earliest_start": "2026-10-21T10:30:00",
+      "duration_minutes": 45,
+      "dock_type": "refrigerated",
+      "missing_fields": []
+    }
+  },
+  {
+    "label": "Ngày tương đối (sáng mai)",
+    "note": "Email gửi chiều 20/10 ghi 'sáng mai 8 giờ' -> GenAI hiểu là 21/10 08:00",
+    "received_at": "2026-10-20T16:00:00+07:00",
+    "input": "Kho ơi, sáng mai 8 giờ xe Hưng Thịnh tới, khoảng 30 phút là dỡ xong.",
+    "expect_can_suggest": true,
+    "llm_output": {
+      "request_id": "{request_id}",
+      "carrier": "Hưng Thịnh",
+      "earliest_start": "2026-10-21T08:00:00",
+      "duration_minutes": 30,
+      "dock_type": "standard",
+      "missing_fields": []
+    }
+  },
+  {
+    "label": "Email ghi giờ UTC",
+    "note": "02:00 UTC = 09:00 GMT+7: code đổi về giờ kho, vẫn đúng thời điểm",
+    "received_at": "2026-10-20T16:00:00+07:00",
+    "input": "Hello, our Global Freight truck arrives at 02:00 UTC on October 21. Unloading takes 60 minutes.",
+    "expect_can_suggest": true,
+    "llm_output": {
+      "request_id": "{request_id}",
+      "carrier": "Global Freight",
+      "earliest_start": "2026-10-21T02:00:00Z",
+      "duration_minutes": 60,
+      "dock_type": "standard",
+      "missing_fields": []
+    }
+  },
+  {
+    "label": "Đến sau giờ đóng cửa",
+    "note": "Đến 18:30 -> cảnh báo; tìm giờ sẽ ra no_slot, không tự chuyển sang hôm sau",
+    "received_at": "2026-10-20T16:00:00+07:00",
+    "input": "Xe Tín Phát bị kẹt xe, chắc 18h30 ngày 21/10 mới tới kho, cần 30 phút dỡ hàng.",
+    "expect_can_suggest": true,
+    "llm_output": {
+      "request_id": "{request_id}",
+      "carrier": "Tín Phát",
+      "earliest_start": "2026-10-21T18:30:00",
+      "duration_minutes": 30,
+      "dock_type": "standard",
+      "missing_fields": []
+    }
+  },
+  {
+    "label": "[Lỗi] Giờ kết thúc trước giờ bắt đầu",
+    "note": "Email ghi đến 15 giờ, xong lúc 14 giờ; giả lập GenAI trả duration_minutes = -60 -> bị chặn",
+    "received_at": "2026-10-20T16:00:00+07:00",
+    "input": "Xe Minh Phát đến lúc 15 giờ ngày 21/10, dự kiến dỡ hàng xong lúc 14 giờ.",
+    "expect_can_suggest": false,
+    "llm_output": {
+      "request_id": "{request_id}",
+      "carrier": "Minh Phát",
+      "earliest_start": "2026-10-21T15:00:00",
+      "duration_minutes": -60,
+      "dock_type": "standard",
+      "missing_fields": []
+    }
+  },
+  {
+    "label": "[Lỗi] GenAI tự đặt mã yêu cầu",
+    "note": "Email có ghi 'mã R01', GenAI chép mã trong email thay vì mã hệ thống cấp -> sai nội dung",
+    "received_at": "2026-10-20T16:00:00+07:00",
+    "input": "Gửi kho, đơn mã R01 của Đông Á Logistics: xe đến 14 giờ ngày 21/10, cần 40 phút.",
+    "expect_can_suggest": false,
+    "llm_output": {
+      "request_id": "R01",
+      "carrier": "Đông Á Logistics",
+      "earliest_start": "2026-10-21T14:00:00",
+      "duration_minutes": 40,
+      "dock_type": "standard",
+      "missing_fields": []
+    }
+  }
+]
