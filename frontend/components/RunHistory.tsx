@@ -37,7 +37,7 @@ export default function RunHistory({ module }: { module: string }) {
         {!runs.length ? <Empty icon={History} text="Chưa có lần xử lý nào." /> : (
           <div className="table-wrap">
             <table className="data-table selectable">
-              <thead><tr><th>Run</th><th>Trạng thái</th><th>Model</th><th>Thời gian GenAI</th><th>Lúc (UTC)</th></tr></thead>
+              <thead><tr><th>Run</th><th>Trạng thái</th><th>Model</th><th>Thời gian GenAI</th><th>Lúc</th></tr></thead>
               <tbody>
                 {runs.map((run) => (
                   <tr key={run.id} onClick={() => setSelected(run)} className={clsx(selected?.id === run.id && "selected")}>
@@ -55,7 +55,7 @@ export default function RunHistory({ module }: { module: string }) {
       </section>
 
       <section className="panel">
-        <PanelHeader title={selected ? `Chi tiết run #${selected.id}` : "Chi tiết"} subtitle="Thời gian lưu theo UTC" />
+        <PanelHeader title={selected ? `Chi tiết run #${selected.id}` : "Chi tiết"} subtitle="Database lưu giờ theo UTC (GMT+0)" />
         {!selected ? <Empty text="Chọn một dòng để xem." /> : (
           <div className="panel-body">
             {selected.error && <p className="form-error">{selected.error}</p>}

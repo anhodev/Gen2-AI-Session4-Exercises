@@ -11,6 +11,8 @@ from typing import Literal
 
 from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, field_validator
 
+from app.core.schemas import Issue  # dùng chung cho 4 bài
+
 # Lấy danh sách cho phép từ một chỗ duy nhất, tránh mỗi file ghi một kiểu.
 Intent = Literal["billing", "technical", "account", "other"]
 Severity = Literal["low", "medium", "high", "critical"]
@@ -61,14 +63,6 @@ class TicketExtraction(BaseModel):
 
 
 # 2. API
-class Issue(BaseModel):
-    """Một vấn đề trong dữ liệu, hiển thị cạnh ô tương ứng trên trang web."""
-
-    field: str
-    message: str
-    level: Literal["error", "warning"]  # error: chặn xác nhận; warning: chỉ nhắc
-
-
 class ExtractRequest(BaseModel):
     """POST /tickets/extract: hệ thống đã biết mã và giờ nhận, GenAI đọc phần còn lại."""
 

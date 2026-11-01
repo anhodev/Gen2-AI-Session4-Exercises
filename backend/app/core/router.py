@@ -5,10 +5,11 @@ from __future__ import annotations
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, field_validator
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from .database import as_utc
 from .dependencies import get_db
 from .entities import Run
 
@@ -33,6 +34,12 @@ class RunOut(BaseModel):
     latency_ms: int
     created_at: datetime
     confirmed_at: datetime | None
+
+    @field_validator("created_at", "confirmed_at")
+    @classmethod
+    def time_must_have_timezone(cls, v):
+        # Database lưu UTC; SQLite trả về không có múi giờ -> gắn UTC để UI hiện đúng
+        return as_utc(v)
 
 
 @router.get("/health")

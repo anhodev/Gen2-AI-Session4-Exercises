@@ -8,7 +8,7 @@ import {
 } from "lucide-react";
 import clsx from "clsx";
 import { api, ApiError } from "@/lib/api";
-import { isOverdue, nowVietnamIso, offsetOf, shortTime } from "@/lib/format";
+import { dayTime, gmtLabel, isOverdue, nowVietnamIso, shortTime } from "@/lib/format";
 import type { ConfirmResponse, ExtractResponse, Intent, Issue, QueueItem, QueueResponse, Sample, Severity } from "@/lib/types";
 import { Empty, FieldIssues, JsonBox, Metric, PanelHeader, SeverityPill } from "./ui";
 
@@ -142,7 +142,7 @@ export default function TicketWorkspace({ llmMode }: { llmMode: string }) {
       <section className="metric-grid">
         <Metric icon={Inbox} label="Ticket đang chờ" value={String(queue?.total ?? 0)} hint="trong hàng đợi" tone="violet" />
         <Metric icon={ListOrdered} label="Đứng đầu hàng đợi" value={head?.ticket_id ?? "—"} hint={head?.severity} tone="blue" />
-        <Metric icon={Hourglass} label="Hạn gần nhất" value={head ? shortTime(head.deadline_at) : "—"} hint={head && isOverdue(head.deadline_at) ? "đã quá hạn" : undefined} tone="amber" />
+        <Metric icon={Hourglass} label="Hạn gần nhất" value={head ? dayTime(head.deadline_at) : "—"} hint={head ? [gmtLabel(head.deadline_at), isOverdue(head.deadline_at) ? "đã quá hạn" : ""].filter(Boolean).join(" · ") : undefined} tone="amber" />
         <Metric icon={UserRoundCheck} label="Vừa lấy ra xử lý" value={current?.ticket_id ?? "—"} hint={current?.severity} tone="green" />
       </section>
 
@@ -194,7 +194,7 @@ export default function TicketWorkspace({ llmMode }: { llmMode: string }) {
               <>
                 <div className="run-meta">
                   <span>run #{extraction.run_id}</span>
-                  <span>nhận lúc {shortTime(extraction.received_at)} ({offsetOf(extraction.received_at)})</span>
+                  <span>nhận lúc {shortTime(extraction.received_at)}</span>
                   <span className={clsx("pill", extraction.can_confirm ? "green" : "red")}>
                     {extraction.can_confirm ? "GenAI trả đúng mẫu" : "GenAI trả có lỗi"}
                   </span>

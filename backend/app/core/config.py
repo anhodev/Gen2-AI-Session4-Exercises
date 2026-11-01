@@ -20,7 +20,9 @@ class Settings:
     mock_llm: bool = True
     database_url: str = SQLITE_FALLBACK
     frontend_origin: str = "http://localhost:3000"
-    app_timezone: str = "Asia/Ho_Chi_Minh"  # múi giờ hiển thị kết quả
+    app_timezone: str = "Asia/Ho_Chi_Minh"  # múi giờ của app (GMT+7), dùng khi email không ghi múi giờ
+    dock_open: str = "08:00"   # Bài 02: giờ mở cửa kho
+    dock_close: str = "18:00"  # Bài 02: giờ đóng cửa kho
 
     @property
     def use_mock(self) -> bool:
@@ -64,4 +66,6 @@ def get_settings() -> Settings:
         database_url=build_database_url(),
         frontend_origin=os.getenv("FRONTEND_ORIGIN", "http://localhost:3000"),
         app_timezone=os.getenv("APP_TIMEZONE", "Asia/Ho_Chi_Minh"),
+        dock_open=os.getenv("DOCK_OPEN", "08:00"),
+        dock_close=os.getenv("DOCK_CLOSE", "18:00"),
     )

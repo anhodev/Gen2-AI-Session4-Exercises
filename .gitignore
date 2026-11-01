@@ -15,6 +15,7 @@ backend/data/
 frontend/node_modules/
 frontend/.next/
 frontend/next-env.d.ts
+frontend/*.tsbuildinfo
 
 # --- Hệ điều hành / editor ---
 .DS_Store
