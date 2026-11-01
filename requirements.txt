@@ -6,8 +6,9 @@ uvicorn[standard]==0.35.0
 pydantic==2.11.7
 python-dotenv==1.1.1
 
-# Lưu lịch sử xử lý (SQLite)
+# Database: Supabase PostgreSQL (SQLite khi chạy test)
 SQLAlchemy==2.0.43
+psycopg[binary]==3.2.9
 
 # GenAI: structured output qua LangChain
 langchain-core==0.3.75
