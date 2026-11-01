@@ -1,20 +1,20 @@
-# --- Python ---
+# --- Backend (Python) ---
 myenv/
 .venv/
 __pycache__/
 *.pyc
 .pytest_cache/
+# SQLite tạo lúc chạy app khi chưa cấu hình Supabase
+backend/data/
 
-# --- Bí mật: API key chỉ nằm ở máy local ---
+# --- Bí mật: API key, mật khẩu database chỉ nằm ở máy local ---
 .env
+.env.local
 
-# --- Dữ liệu chạy thử (SQLite tạo lúc chạy app) ---
-data/*.db
-
-# --- Frontend (Next.js, dùng ở các phần sau) ---
+# --- Frontend (Next.js) ---
 frontend/node_modules/
 frontend/.next/
-frontend/.env.local
+frontend/next-env.d.ts
 
 # --- Hệ điều hành / editor ---
 .DS_Store
