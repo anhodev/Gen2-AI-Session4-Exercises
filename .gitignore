@@ -1,0 +1,22 @@
+# --- Python ---
+myenv/
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# --- Bí mật: API key chỉ nằm ở máy local ---
+.env
+
+# --- Dữ liệu chạy thử (SQLite tạo lúc chạy app) ---
+data/*.db
+
+# --- Frontend (Next.js, dùng ở các phần sau) ---
+frontend/node_modules/
+frontend/.next/
+frontend/.env.local
+
+# --- Hệ điều hành / editor ---
+.DS_Store
+.vscode/
+.idea/
