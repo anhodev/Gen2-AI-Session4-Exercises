@@ -4,7 +4,6 @@ uvicorn[standard]==0.35.0
 
 # Schema + đọc cấu hình từ .env
 pydantic==2.11.7
-pydantic-settings==2.10.1
 python-dotenv==1.1.1
 
 # Lưu lịch sử xử lý (SQLite)

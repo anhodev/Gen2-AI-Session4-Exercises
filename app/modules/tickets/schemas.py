@@ -9,7 +9,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Literal
 
-from pydantic import AwareDatetime, BaseModel, ConfigDict, Field
+from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, field_validator
 
 # Lấy danh sách cho phép từ một chỗ duy nhất, tránh mỗi file ghi một kiểu.
 Intent = Literal["billing", "technical", "account", "other"]
@@ -18,20 +18,16 @@ Severity = Literal["low", "medium", "high", "critical"]
 SUMMARY_MAX = 200
 
 
-# ---------------------------------------------------------------------------
 # 1. Mẫu GenAI phải điền
-# ---------------------------------------------------------------------------
-
 class TicketExtraction(BaseModel):
     """Thông tin GenAI đọc ra từ tin nhắn của khách hàng."""
 
     # extra="forbid": GenAI trả thêm ô lạ thì báo lỗi, không lặng lẽ bỏ qua.
     model_config = ConfigDict(extra="forbid")
 
-    ticket_id: str = Field(
-        description="Lấy mã ticket hệ thống đã cấp. Không tự tạo mã mới.",
-    )
+    ticket_id: str = Field(..., description="Lấy mã ticket hệ thống đã cấp. Không tự tạo mã mới.")
     intent: Intent = Field(
+        ...,
         description=(
             "Khách hỏi về việc gì: billing (thanh toán, bị trừ tiền), "
             "technical (lỗi kỹ thuật, app không chạy), account (đăng nhập, mật khẩu, tài khoản), "
@@ -39,6 +35,7 @@ class TicketExtraction(BaseModel):
         ),
     )
     severity: Severity = Field(
+        ...,
         description=(
             "Mức độ khẩn cấp: critical (mất tiền hoặc không dùng được dịch vụ chính, nhiều người bị ảnh hưởng), "
             "high (lỗi nghiêm trọng với một khách, ví dụ bị tính tiền hai lần), "
@@ -46,21 +43,24 @@ class TicketExtraction(BaseModel):
         ),
     )
     product: str | None = Field(
-        description="Sản phẩm hoặc tính năng khách nhắc tới, ví dụ 'checkout'. null nếu khách không nói.",
+        ..., description="Sản phẩm hoặc tính năng khách nhắc tới, ví dụ 'checkout'. null nếu khách không nói."
     )
     summary: str = Field(
-        max_length=SUMMARY_MAX,
-        description=f"Tóm tắt vấn đề bằng tiếng Việt, tối đa {SUMMARY_MAX} ký tự.",
+        ..., max_length=SUMMARY_MAX, description=f"Tóm tắt vấn đề bằng tiếng Việt, tối đa {SUMMARY_MAX} ký tự."
     )
     needs_human_review: bool = Field(
-        description="true nếu tin nhắn mơ hồ hoặc không chắc chắn. Khi đó intent nên là 'other'.",
+        ..., description="true nếu tin nhắn mơ hồ hoặc không chắc chắn. Khi đó intent nên là 'other'."
     )
 
+    @field_validator("summary")
+    @classmethod
+    def summary_must_not_be_empty(cls, v):
+        if not v.strip():
+            raise ValueError("Tóm tắt đang rỗng")
+        return v
 
-# ---------------------------------------------------------------------------
+
 # 2. API
-# ---------------------------------------------------------------------------
-
 class Issue(BaseModel):
     """Một vấn đề trong dữ liệu, hiển thị cạnh ô tương ứng trên trang web."""
 

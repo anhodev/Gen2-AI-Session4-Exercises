@@ -13,10 +13,7 @@ import heapq
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 
-# ---------------------------------------------------------------------------
 # Hằng số nghiệp vụ
-# ---------------------------------------------------------------------------
-
 SEVERITY_RANK: dict[str, int] = {"critical": 4, "high": 3, "medium": 2, "low": 1}
 
 SLA: dict[str, timedelta] = {
@@ -27,16 +24,13 @@ SLA: dict[str, timedelta] = {
 }
 
 
-# ---------------------------------------------------------------------------
-# Lỗi: mỗi loại một class để API trả thông báo rõ ràng cho người dùng
-# ---------------------------------------------------------------------------
-
+# Lỗi: mỗi loại một class để API trả mã lỗi phù hợp (vd: trùng mã -> 409)
 class TicketError(ValueError):
     """Lỗi chung của module ticket."""
 
 
 class InvalidSeverityError(TicketError):
-    pass
+    """Mức khẩn cấp không nằm trong danh sách cho phép."""
 
 
 class NaiveDatetimeError(TicketError):
@@ -44,12 +38,8 @@ class NaiveDatetimeError(TicketError):
 
 
 class DuplicateTicketError(TicketError):
-    pass
+    """Mã ticket đã từng vào hàng đợi."""
 
-
-# ---------------------------------------------------------------------------
-# Dữ liệu
-# ---------------------------------------------------------------------------
 
 @dataclass(frozen=True)
 class QueuedTicket:
@@ -71,32 +61,62 @@ class QueuedTicket:
 
 
 def compute_deadline(received_at: datetime, severity: str) -> datetime:
-    """Tính hạn xử lý = thời điểm nhận + SLA của mức khẩn cấp."""
+    """
+    Tính hạn xử lý = thời điểm nhận + SLA của mức khẩn cấp.
+
+    Args:
+        received_at (datetime): Thời điểm nhận ticket, bắt buộc có múi giờ.
+        severity (str): Mức khẩn cấp: low, medium, high, critical.
+
+    Raises:
+        InvalidSeverityError: Mức khẩn cấp không hợp lệ.
+        NaiveDatetimeError: received_at thiếu múi giờ.
+
+    Returns:
+        datetime: Hạn xử lý.
+    """
+    # Kiểm tra mức khẩn cấp có trong danh sách SLA không
     if severity not in SLA:
         raise InvalidSeverityError(
             f"Mức khẩn cấp '{severity}' không hợp lệ. Chỉ nhận: {', '.join(SLA)}"
         )
+
+    # Kiểm tra thời gian có múi giờ không
     if received_at.tzinfo is None or received_at.utcoffset() is None:
         raise NaiveDatetimeError(
             f"received_at '{received_at.isoformat()}' thiếu múi giờ (ví dụ +07:00)"
         )
+
     return received_at + SLA[severity]
 
 
 def make_ticket(ticket_id: str, received_at: datetime, severity: str, summary: str = "") -> QueuedTicket:
-    """Kiểm tra dữ liệu rồi tạo ticket kèm deadline đã tính."""
+    """
+    Kiểm tra dữ liệu rồi tạo ticket kèm deadline đã tính.
+
+    Args:
+        ticket_id (str): Mã ticket hệ thống đã cấp.
+        received_at (datetime): Thời điểm nhận, có múi giờ.
+        severity (str): Mức khẩn cấp.
+        summary (str, optional): Tóm tắt nội dung. Defaults to "".
+
+    Raises:
+        TicketError: ticket_id rỗng, hoặc lỗi từ compute_deadline.
+
+    Returns:
+        QueuedTicket: Ticket sẵn sàng đưa vào hàng đợi.
+    """
     if not ticket_id or not ticket_id.strip():
         raise TicketError("ticket_id không được rỗng")
+
+    # Code tự tính hạn, GenAI không tham gia bước này
     deadline = compute_deadline(received_at, severity)
     return QueuedTicket(ticket_id.strip(), received_at, severity, deadline, summary)
 
 
-# ---------------------------------------------------------------------------
-# Hàng đợi ưu tiên
-# ---------------------------------------------------------------------------
-
 class TicketQueue:
-    """Min-heap theo sort_key.
+    """
+    Hàng đợi ưu tiên dùng min-heap theo sort_key.
 
     Mỗi phần tử trong heap là (sort_key, ticket). ticket_id là duy nhất và
     nằm cuối sort_key, nên hai khóa không bao giờ bằng nhau.
@@ -111,34 +131,68 @@ class TicketQueue:
         return len(self._heap)
 
     def add(self, ticket: QueuedTicket) -> None:
-        """Thêm ticket. Quy tắc mã trùng: từ chối, không ghi đè."""
+        """
+        Thêm ticket vào hàng đợi. O(log n).
+
+        Args:
+            ticket (QueuedTicket): Ticket đã xác nhận.
+
+        Raises:
+            DuplicateTicketError: Mã ticket đã tồn tại. Quy tắc: từ chối, không ghi đè.
+        """
         if ticket.ticket_id in self._seen_ids:
             raise DuplicateTicketError(f"ticket_id '{ticket.ticket_id}' đã tồn tại")
+
         self._seen_ids.add(ticket.ticket_id)
         heapq.heappush(self._heap, (ticket.sort_key(), ticket))
 
     def pop_next(self) -> QueuedTicket | None:
-        """Lấy ticket cần xử lý tiếp theo và xóa khỏi hàng đợi. O(log n)."""
+        """
+        Lấy ticket cần xử lý tiếp theo và xóa khỏi hàng đợi. O(log n).
+
+        Returns:
+            QueuedTicket | None: Ticket đầu hàng đợi, None nếu hàng đợi rỗng.
+        """
         if not self._heap:
             return None
         _, ticket = heapq.heappop(self._heap)
         return ticket
 
     def peek_top(self, k: int) -> list[QueuedTicket]:
-        """Xem k ticket đầu hàng đợi, KHÔNG xóa.
+        """
+        Xem k ticket đầu hàng đợi, KHÔNG xóa. O(n log k).
 
         heapq.nsmallest chỉ đọc list, không sửa self._heap,
         nên lần pop_next sau vẫn cho đúng kết quả.
+
+        Args:
+            k (int): Số ticket muốn xem, phải >= 1.
+
+        Raises:
+            TicketError: k < 1.
+
+        Returns:
+            list[QueuedTicket]: Tối đa k ticket, đã xếp theo thứ tự ưu tiên.
         """
         if k < 1:
             raise TicketError("k phải >= 1")
         return [t for _, t in heapq.nsmallest(k, self._heap)]
 
     def ranked_view(self, k: int) -> list[dict]:
-        """Top k kèm lý do xếp hạng, để hiển thị trên trang web."""
+        """
+        Top k ticket kèm lý do xếp hạng, để hiển thị trên trang web.
+
+        Args:
+            k (int): Số ticket muốn xem.
+
+        Returns:
+            list[dict]: Mỗi phần tử gồm position, ticket, reason.
+        """
         top = self.peek_top(k)
+
         # Lấy thêm 1 ticket để giải thích vì sao ticket cuối đứng trên nó.
         extended = self.peek_top(k + 1) if len(self._heap) > k else top
+
         rows = []
         for i, ticket in enumerate(top):
             behind = extended[i + 1] if i + 1 < len(extended) else None
@@ -146,21 +200,26 @@ class TicketQueue:
         return rows
 
 
-# ---------------------------------------------------------------------------
-# Giải thích lý do xếp hạng
-# ---------------------------------------------------------------------------
-
 def explain(ticket: QueuedTicket, behind: QueuedTicket | None) -> str:
-    """Giải thích vì sao `ticket` đứng trước `behind` (ticket ngay sau nó).
+    """
+    Giải thích vì sao `ticket` đứng trước `behind` (ticket ngay sau nó).
 
     Đi lần lượt theo thứ tự các phần của sort_key: phần nào khác nhau
     đầu tiên chính là lý do.
+
+    Args:
+        ticket (QueuedTicket): Ticket cần giải thích.
+        behind (QueuedTicket | None): Ticket đứng ngay sau, None nếu là ticket cuối.
+
+    Returns:
+        str: Lý do xếp hạng.
     """
     sla_minutes = int(SLA[ticket.severity].total_seconds() // 60)
     base = (
         f"Hạn {ticket.deadline_at.strftime('%Y-%m-%d %H:%M %z')} "
         f"({ticket.severity}, SLA {sla_minutes} phút từ lúc nhận)"
     )
+
     if behind is None:
         return base
     if ticket.deadline_at != behind.deadline_at:
