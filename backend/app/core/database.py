@@ -36,7 +36,6 @@ def make_session_factory(database_url: str):
         if db_path and db_path != database_url:
             Path(db_path).parent.mkdir(parents=True, exist_ok=True)
     elif database_url.startswith("postgresql"):
-        # Supabase pooler (transaction mode, cổng 6543) không hỗ trợ prepared statement.
         connect_args = {"prepare_threshold": None}
 
     engine = create_engine(database_url, connect_args=connect_args, pool_pre_ping=True)
@@ -47,8 +46,8 @@ def make_session_factory(database_url: str):
 def create_tables(engine: Engine) -> None:
     """Tạo các bảng còn thiếu. Gọi khi app khởi động."""
     # Import để SQLAlchemy biết có những bảng nào
-    from app.core import entities  # noqa: F401
-    from app.modules.tickets import entities as ticket_entities  # noqa: F401
+    from app.core import entities  
+    from app.modules.tickets import entities as ticket_entities 
 
     Base.metadata.create_all(bind=engine)
 

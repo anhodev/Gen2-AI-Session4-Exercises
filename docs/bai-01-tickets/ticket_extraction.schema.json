@@ -1,0 +1,66 @@
+{
+  "additionalProperties": false,
+  "description": "Thông tin GenAI đọc ra từ tin nhắn của khách hàng.",
+  "properties": {
+    "ticket_id": {
+      "description": "Lấy mã ticket hệ thống đã cấp. Không tự tạo mã mới.",
+      "title": "Ticket Id",
+      "type": "string"
+    },
+    "intent": {
+      "description": "Khách hỏi về việc gì: billing (thanh toán, bị trừ tiền), technical (lỗi kỹ thuật, app không chạy), account (đăng nhập, mật khẩu, tài khoản), other (việc khác hoặc tin nhắn mơ hồ).",
+      "enum": [
+        "billing",
+        "technical",
+        "account",
+        "other"
+      ],
+      "title": "Intent",
+      "type": "string"
+    },
+    "severity": {
+      "description": "Mức độ khẩn cấp: critical (mất tiền hoặc không dùng được dịch vụ chính, nhiều người bị ảnh hưởng), high (lỗi nghiêm trọng với một khách, ví dụ bị tính tiền hai lần), medium (lỗi có cách tạm khắc phục), low (câu hỏi, hướng dẫn sử dụng).",
+      "enum": [
+        "low",
+        "medium",
+        "high",
+        "critical"
+      ],
+      "title": "Severity",
+      "type": "string"
+    },
+    "product": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "Sản phẩm hoặc tính năng khách nhắc tới, ví dụ 'checkout'. null nếu khách không nói.",
+      "title": "Product"
+    },
+    "summary": {
+      "description": "Tóm tắt vấn đề bằng tiếng Việt, tối đa 200 ký tự.",
+      "maxLength": 200,
+      "title": "Summary",
+      "type": "string"
+    },
+    "needs_human_review": {
+      "description": "true nếu tin nhắn mơ hồ hoặc không chắc chắn. Khi đó intent nên là 'other'.",
+      "title": "Needs Human Review",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "ticket_id",
+    "intent",
+    "severity",
+    "product",
+    "summary",
+    "needs_human_review"
+  ],
+  "title": "TicketExtraction",
+  "type": "object"
+}
