@@ -112,3 +112,27 @@ class BookingOut(BaseModel):
     carrier: str | None
     start: datetime
     end: datetime
+    edited_fields: list[str] = []   # các ô người dùng đã sửa so với GenAI
+
+
+class ScheduleBooking(BaseModel):
+    request_id: str | None   # None: lịch có sẵn (seed)
+    carrier: str | None
+    start: datetime
+    end: datetime
+
+
+class DockSchedule(BaseModel):
+    dock_id: str
+    dock_type: DockType
+    bookings: list[ScheduleBooking]
+
+
+class ScheduleOut(BaseModel):
+    """GET /docks/schedule: lịch một ngày của tất cả cửa."""
+
+    date: str          # YYYY-MM-DD theo giờ kho
+    timezone: str      # ví dụ "GMT+7", để UI luôn hiển thị múi giờ
+    open_at: datetime
+    close_at: datetime
+    docks: list[DockSchedule]

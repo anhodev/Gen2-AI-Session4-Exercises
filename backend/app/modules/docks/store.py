@@ -112,15 +112,19 @@ def load_bookings(db: Session, start: datetime, end: datetime, tz: tzinfo) -> li
     Returns:
         list[algo.Booking]: Lịch đã đặt, giờ theo múi giờ kho.
     """
-    rows = db.scalars(
+    return [
+        algo.Booking(r.dock_id, as_utc(r.start_at).astimezone(tz), as_utc(r.end_at).astimezone(tz), r.request_id)
+        for r in load_booking_rows(db, start, end)
+    ]
+
+
+def load_booking_rows(db: Session, start: datetime, end: datetime) -> list[DockBooking]:
+    """Bản ghi lịch giao với khoảng [start, end), đủ cột (carrier...) để hiển thị lịch."""
+    return list(db.scalars(
         select(DockBooking)
         .where(DockBooking.start_at < to_utc(end), DockBooking.end_at > to_utc(start))
         .order_by(DockBooking.dock_id, DockBooking.start_at)
-    )
-    return [
-        algo.Booking(r.dock_id, as_utc(r.start_at).astimezone(tz), as_utc(r.end_at).astimezone(tz), r.request_id)
-        for r in rows
-    ]
+    ))
 
 
 def create_booking(
@@ -134,6 +138,7 @@ def create_booking(
     run: Run | None = None,
     user_output: dict | None = None,
     cleanup: timedelta = timedelta(0),
+    baseline: dict | None = None,
 ) -> DockBooking:
     """
     Đặt lịch sau khi kiểm tra lại trên dữ liệu mới nhất.
@@ -149,6 +154,7 @@ def create_booking(
         run (Run | None, optional): Lần extract tương ứng, để ghi kết quả vào lịch sử.
         user_output (dict | None, optional): Bản người dùng đã sửa, lưu vào lịch sử.
         cleanup (timedelta, optional): Thời gian dọn cửa giữa hai xe. Defaults to 0.
+        baseline (dict | None, optional): Bản GenAI đã chuẩn hóa, để tìm ô người dùng đã sửa.
 
     Raises:
         InvalidIntervalError: Giờ kết thúc không sau giờ bắt đầu.
@@ -210,7 +216,7 @@ def create_booking(
             "dock_id": dock_id,
             "start": slot.start.astimezone(tz).isoformat(),
             "end": slot.end.astimezone(tz).isoformat(),
-        })
+        }, baseline=baseline)
 
     try:
         db.commit()

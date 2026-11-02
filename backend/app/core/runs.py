@@ -54,11 +54,22 @@ def changed_fields(before: dict | None, after: dict) -> list[str]:
     return sorted(key for key in after if before.get(key) != after[key])
 
 
-def mark_confirmed(run: Run, user_output: dict, result: dict) -> None:
-    """Ghi bản người dùng sửa và kết quả cuối vào run. Người gọi tự commit."""
+def mark_confirmed(run: Run, user_output: dict, result: dict, baseline: dict | None = None) -> None:
+    """
+    Ghi bản người dùng sửa và kết quả cuối vào run. Người gọi tự commit.
+
+    Args:
+        run (Run): Lần extract.
+        user_output (dict): Bản người dùng đã sửa.
+        result (dict): Kết quả cuối.
+        baseline (dict | None, optional): Bản dùng để so sánh tìm ô đã sửa. Bài 02 truyền bản
+            GenAI đã chuẩn hóa giờ, để "02:00Z" và "09:00+07:00" không bị tính là đã sửa.
+            Defaults to run.llm_output.
+    """
     run.status = "confirmed"
     run.user_output = user_output
-    run.result = {**result, "edited_fields": changed_fields(run.llm_output, user_output)}
+    before = baseline if baseline is not None else run.llm_output
+    run.result = {**result, "edited_fields": changed_fields(before, user_output)}
     run.confirmed_at = now_utc()
 
 
