@@ -143,6 +143,41 @@ code { font-family:ui-monospace, SFMono-Regular, Menlo, monospace; font-size:.92
 .data-table tr.selected { background:#f3f0ff; }
 .table-note { margin:0; padding:10px 14px; font-size:12px; color:var(--muted); }
 
+/* --- Bài 02: gợi ý giờ và timeline cửa kho --- */
+.slot-card, .conflict-card { display:flex; gap:10px; align-items:flex-start; border-radius:11px; padding:12px 14px; }
+.slot-card { background:#e9f1ff; color:#2c5fa8; }
+.conflict-card { background:var(--amber-bg); color:var(--amber); }
+.slot-card svg, .conflict-card svg { flex:none; margin-top:2px; }
+.slot-card strong, .conflict-card strong { display:block; font-size:13px; margin-bottom:3px; }
+.slot-card span, .conflict-card span { display:block; font-size:12px; line-height:1.5; }
+.slot-card ul { list-style:none; margin:8px 0 0; padding:0; display:flex; flex-direction:column; gap:3px; font-size:12px; }
+.slot-card li { color:#4f6f9c; }
+.slot-card li.chosen { color:#1d4f96; font-weight:700; }
+.toolbar input[type=date] { height:38px; border:1px solid #ddd9e2; border-radius:9px; padding:0 8px; background:white; }
+
+.timeline { border-top:1px solid var(--line); padding:14px 20px 18px; display:flex; flex-direction:column; gap:8px; overflow-x:auto; }
+.timeline-row { display:flex; align-items:stretch; gap:12px; min-width:620px; }
+.timeline-label { width:96px; flex:none; display:flex; flex-direction:column; justify-content:center; font-size:12px; }
+.timeline-label small { color:var(--muted); font-size:11px; }
+.timeline-track { position:relative; flex:1; height:44px; background:#faf9fc; border:1px solid var(--line); border-radius:9px; }
+.timeline-track > i { position:absolute; top:0; bottom:0; width:1px; background:#eeebf2; }
+.timeline-axis .timeline-label { font-weight:800; color:#5b3fe0; font-size:11px; }
+.timeline-axis .timeline-track { height:20px; background:none; border:0; }
+.timeline-axis .timeline-track span { position:absolute; transform:translateX(-50%); font-size:11px; color:var(--muted); white-space:nowrap; }
+.timeline-axis .timeline-track span:first-child { transform:none; }
+.timeline-axis .timeline-track span:last-child { transform:translateX(-100%); }
+.block { position:absolute; top:5px; bottom:5px; border-radius:7px; display:flex; align-items:center; padding:0 7px; overflow:hidden; font-size:11px; font-weight:700; box-sizing:border-box; }
+.block span { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.block.seed { background:#e3e0ea; color:#5e5a66; border:1px solid #fff; }
+.block.booked { background:var(--purple); color:white; border:1px solid #fff; }
+.block.suggested { background:#e3f8ed; color:#1f7a4d; border:2px dashed #3aa86f; }
+.timeline-legend { display:flex; flex-wrap:wrap; gap:14px; font-size:11px; color:var(--muted); align-items:center; padding-top:4px; }
+.timeline-legend i { display:inline-block; width:12px; height:12px; border-radius:3px; vertical-align:-2px; margin-right:4px; }
+.timeline-legend i.seed { background:#e3e0ea; }
+.timeline-legend i.booked { background:var(--purple); }
+.timeline-legend i.suggested { background:#e3f8ed; border:2px dashed #3aa86f; }
+.timeline-tz { margin-left:auto; font-weight:700; color:#55515c; }
+
 .spin { animation:spin .8s linear infinite; }
 @keyframes spin { to { transform:rotate(360deg); } }
 

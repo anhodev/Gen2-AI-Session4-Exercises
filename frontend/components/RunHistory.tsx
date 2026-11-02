@@ -10,8 +10,13 @@ import type { Run } from "@/lib/types";
 import { Empty, JsonBox, PanelHeader } from "./ui";
 
 const STATUS_TONE: Record<Run["status"], string> = { extracted: "blue", confirmed: "green", rejected: "red" };
+const MODULES = [
+  { id: "tickets", label: "01 · Ticket" },
+  { id: "docks", label: "02 · Giờ nhận xe" },
+];
 
-export default function RunHistory({ module }: { module: string }) {
+export default function RunHistory() {
+  const [module, setModule] = useState("tickets");
   const [runs, setRuns] = useState<Run[]>([]);
   const [selected, setSelected] = useState<Run | null>(null);
   const [error, setError] = useState("");
@@ -32,7 +37,16 @@ export default function RunHistory({ module }: { module: string }) {
   return (
     <div className="history-grid">
       <section className="panel">
-        <PanelHeader title="Các lần xử lý" subtitle="Mới nhất trước" action={<button className="secondary-button" onClick={load}><RefreshCw size={14} /> Làm mới</button>} />
+        <PanelHeader title="Các lần xử lý" subtitle="Mới nhất trước" action={
+          <div className="toolbar">
+            <label>Bài
+              <select value={module} onChange={(e) => { setModule(e.target.value); setSelected(null); }}>
+                {MODULES.map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}
+              </select>
+            </label>
+            <button className="secondary-button" onClick={load}><RefreshCw size={14} /> Làm mới</button>
+          </div>
+        } />
         {error && <p className="queue-message">{error}</p>}
         {!runs.length ? <Empty icon={History} text="Chưa có lần xử lý nào." /> : (
           <div className="table-wrap">
@@ -41,7 +55,7 @@ export default function RunHistory({ module }: { module: string }) {
               <tbody>
                 {runs.map((run) => (
                   <tr key={run.id} onClick={() => setSelected(run)} className={clsx(selected?.id === run.id && "selected")}>
-                    <td><strong>#{run.id}</strong><small>{String(run.raw_input.ticket_id ?? "")}</small></td>
+                    <td><strong>#{run.id}</strong><small>{String(run.raw_input.ticket_id ?? run.raw_input.request_id ?? "")}</small></td>
                     <td><span className={`pill ${STATUS_TONE[run.status]}`}>{run.status}</span></td>
                     <td>{run.model}</td>
                     <td>{run.latency_ms} ms</td>
