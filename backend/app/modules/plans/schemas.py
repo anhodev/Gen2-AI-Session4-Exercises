@@ -2,12 +2,16 @@
   1. PlanExtraction: mẫu JSON GenAI phải điền từ biên bản họp (task + dependency).
   2. PlanIn: bản người dùng đã xem/sửa, gửi lên để kiểm tra và tính thứ tự.
   3. Request / Response của API.
+  4. Kết quả tính thứ tự và lịch sử các lần tính.
 
 Mã task do backend cấp (T01, T02… theo thứ tự xuất hiện trong biên bản), chỉ có nghĩa trong một kế hoạch.
 GenAI chỉ đặt mã tạm (A, B, C…) để nối task với dependency; backend đổi sang T01… sau khi kiểm tra.
 """
 
 from __future__ import annotations
+
+from datetime import datetime
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -124,3 +128,48 @@ class ValidateOut(BaseModel):
     plan: PlanOut | None       # None nếu sai khuôn
     issues: list[Issue]
     can_order: bool            # không có lỗi "error"
+
+
+class PlanRequest(BaseModel):
+    """POST /plans/validate và /plans/order: bản người dùng đã xem/sửa của một lần extract."""
+
+    run_id: int
+    plan: PlanIn
+
+
+# 4. Kết quả tính thứ tự
+class StepOut(BaseModel):
+    """Một việc trong thứ tự, kèm lý do đứng ở vị trí đó."""
+
+    position: int          # 1, 2…
+    task: TaskIn
+    waits_for: list[str]   # mã các việc phải xong trước
+    reason: str            # vd "Chờ T01, T02 xong"
+
+
+class OrderOut(BaseModel):
+    order_id: int
+    run_id: int
+    version: int                         # lần tính thứ mấy của biên bản này
+    status: Literal["ordered", "cycle_detected"]
+    reason: str
+    steps: list[StepOut]                 # rỗng khi có vòng: không trả nửa danh sách
+    cycle: list[str]                     # vd ["T01", "T03", "T04", "T01"]
+    cycle_dependencies: list[DependencyIn]  # các quan hệ tạo thành vòng, kèm câu bằng chứng để người dùng sửa
+    blocked: list[TaskIn]                # mọi việc chưa xếp được (trong vòng hoặc chờ vòng)
+    plan: PlanOut                        # bản đã dùng để tính
+    warnings: list[Issue]
+    created_at: datetime
+
+
+class OrderSummary(BaseModel):
+    """Một dòng trong lịch sử các lần tính."""
+
+    order_id: int
+    run_id: int
+    version: int
+    status: Literal["ordered", "cycle_detected"]
+    reason: str
+    task_count: int
+    dependency_count: int
+    created_at: datetime

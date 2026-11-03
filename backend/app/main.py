@@ -20,6 +20,7 @@ from app.modules.docks.router import router as docks_router
 from app.modules.docks.store import seed_docks
 from app.modules.expenses.router import router as expenses_router
 from app.modules.expenses.store import load_index
+from app.modules.plans.router import router as plans_router
 from app.modules.tickets.router import router as tickets_router
 from app.modules.tickets.store import load_queue
 
@@ -84,6 +85,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(tickets_router)
     app.include_router(docks_router)
     app.include_router(expenses_router)
+    app.include_router(plans_router)
     return app
 
 
