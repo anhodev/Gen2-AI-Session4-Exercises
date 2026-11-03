@@ -118,7 +118,8 @@ def call_mock(task: str, user_prompt: str, samples_dir: Path = SAMPLES_DIR, mock
     Trả JSON viết sẵn trong samples/<task>.json, không tốn tiền gọi model.
 
     Mỗi mẫu có "input" (văn bản gốc) và "llm_output" (JSON giả lập GenAI trả).
-    Nếu nội dung gửi lên chứa đúng "input" của một mẫu thì trả mẫu đó.
+    Nếu nội dung gửi lên chứa đúng "input" của một mẫu thì trả mẫu đó. Nhiều mẫu cùng khớp
+    (vd mẫu 2 là mẫu 1 thêm một câu) thì lấy mẫu dài nhất, tức mẫu khớp sát nhất.
     Ô có giá trị "{tên}" (vd "{request_id}") được thay bằng mock_vars["tên"],
     vì mã yêu cầu do backend sinh lúc chạy, không viết sẵn trong mẫu được.
 
@@ -132,9 +133,10 @@ def call_mock(task: str, user_prompt: str, samples_dir: Path = SAMPLES_DIR, mock
         LLMResult: Kết quả giả lập, model="mock".
     """
     prompt = normalize(user_prompt)
-    for sample in load_samples(task, samples_dir):
-        if normalize(sample["input"]) in prompt:
-            return LLMResult(fill_placeholders(sample["llm_output"], mock_vars or {}), "mock", 0)
+    matches = [s for s in load_samples(task, samples_dir) if normalize(s["input"]) in prompt]
+    if matches:
+        best = max(matches, key=lambda s: len(normalize(s["input"])))
+        return LLMResult(fill_placeholders(best["llm_output"], mock_vars or {}), "mock", 0)
 
     return LLMResult(
         None, "mock", 0,

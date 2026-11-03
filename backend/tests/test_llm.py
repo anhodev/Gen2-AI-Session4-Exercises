@@ -35,6 +35,16 @@ def test_mock_matches_sample_ignoring_spaces_and_case(tmp_path):
     assert result.model == "mock" and result.error is None
 
 
+def test_mock_prefers_longest_matching_sample(tmp_path):
+    # Mẫu 2 chứa trọn mẫu 1 (thêm một câu): gửi mẫu 2 phải nhận kết quả của mẫu 2
+    (tmp_path / "demo.json").write_text(
+        '[{"input": "A trước C.", "llm_output": {"n": 1}}, {"input": "A trước C. D trước A.", "llm_output": {"n": 2}}]',
+        encoding="utf-8",
+    )
+    assert llm.call_mock("demo", "<minutes>A trước C. D trước A.</minutes>", tmp_path).raw == {"n": 2}
+    assert llm.call_mock("demo", "<minutes>A trước C.</minutes>", tmp_path).raw == {"n": 1}
+
+
 def test_mock_unknown_text_returns_error(tmp_path):
     result = llm.call_mock("demo", "nội dung lạ", tmp_path)
     assert result.raw is None

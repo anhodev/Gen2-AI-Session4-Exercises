@@ -111,6 +111,15 @@ class PlanOut(BaseModel):
     dependencies: list[DependencyIn]
 
 
+class ExtractResponse(BaseModel):
+    run_id: int | None = None
+    llm_output: dict | None   # JSON GenAI trả về (mã tạm A, B…), giữ nguyên để người dùng xem
+    llm_issues: list[Issue]   # vấn đề của JSON gốc, theo mã tạm và vị trí trong llm_output (vd "Mã B bị trùng")
+    plan: PlanOut | None      # đã đổi sang mã T01…, None nếu sai khuôn
+    issues: list[Issue]       # kiểm tra lại plan, theo mã T01… và vị trí trong plan: gắn vào đúng dòng người dùng sửa
+    can_order: bool           # plan không còn lỗi (mã lạ, tự chờ chính nó…)
+
+
 class ValidateOut(BaseModel):
     plan: PlanOut | None       # None nếu sai khuôn
     issues: list[Issue]
