@@ -1,0 +1,104 @@
+{
+  "$defs": {
+    "DependencyExtraction": {
+      "additionalProperties": false,
+      "properties": {
+        "after": {
+          "description": "Mã task chỉ làm được sau khi task 'before' xong.",
+          "maxLength": 20,
+          "minLength": 1,
+          "title": "After",
+          "type": "string"
+        },
+        "before": {
+          "description": "Mã task phải xong trước.",
+          "maxLength": 20,
+          "minLength": 1,
+          "title": "Before",
+          "type": "string"
+        },
+        "evidence": {
+          "description": "Chép nguyên văn câu (hoặc một đoạn câu) trong biên bản cho thấy quan hệ trước-sau này. Không có câu nào như vậy thì KHÔNG được tạo dependency.",
+          "maxLength": 300,
+          "minLength": 1,
+          "title": "Evidence",
+          "type": "string"
+        }
+      },
+      "required": [
+        "before",
+        "after",
+        "evidence"
+      ],
+      "title": "DependencyExtraction",
+      "type": "object"
+    },
+    "TaskExtraction": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "description": "Mã tạm để nối task với dependency. Biên bản đã đánh mã (A, B, 1, 2…) thì dùng đúng mã đó, nếu không thì đặt A, B, C… theo thứ tự xuất hiện. Không dùng tên việc làm mã. Mỗi task một mã khác nhau.",
+          "maxLength": 20,
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "owner": {
+          "anyOf": [
+            {
+              "maxLength": 100,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Người hoặc nhóm phụ trách. null nếu biên bản không nói.",
+          "title": "Owner"
+        },
+        "title": {
+          "description": "Tên công việc, ngắn gọn, giữ ý của biên bản.",
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Title",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "title",
+        "owner"
+      ],
+      "title": "TaskExtraction",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Danh sách việc và quan hệ trước-sau GenAI đọc ra từ biên bản họp.",
+  "properties": {
+    "dependencies": {
+      "description": "Quan hệ trước-sau: 'before' phải xong rồi mới làm 'after'. Chỉ ghi khi biên bản nói rõ, kèm câu bằng chứng. Không tự suy ra quan hệ từ kinh nghiệm. Không có quan hệ nào thì để [].",
+      "items": {
+        "$ref": "#/$defs/DependencyExtraction"
+      },
+      "maxItems": 500,
+      "title": "Dependencies",
+      "type": "array"
+    },
+    "tasks": {
+      "description": "Các công việc trong biên bản.",
+      "items": {
+        "$ref": "#/$defs/TaskExtraction"
+      },
+      "maxItems": 100,
+      "title": "Tasks",
+      "type": "array"
+    }
+  },
+  "required": [
+    "tasks",
+    "dependencies"
+  ],
+  "title": "PlanExtraction",
+  "type": "object"
+}

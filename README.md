@@ -10,7 +10,7 @@ Bài tập Gen2-AI: 4 tình huống doanh nghiệp ghép thành **một ứng d�
 | [01](docs/bai-01-tickets/README.md) | Khách hàng nào cần được hỗ trợ trước? | Hàng đợi ưu tiên (min-heap) | ✅ Xong |
 | [02](docs/bai-02-docks/README.md) | Xe giao hàng nên vào cửa kho lúc mấy giờ? | Gộp khoảng thời gian (interval) | ✅ Xong |
 | [03](docs/bai-03-expenses/README.md) | Hóa đơn này đã được gửi trước đó chưa? | Tra cứu bằng hash map | ✅ Xong |
-| 04 | Việc nào phải làm trước? | Đồ thị phụ thuộc (topological sort) | Chưa làm |
+| [04](docs/bai-04-plans/README.md) | Việc nào phải làm trước? | Đồ thị phụ thuộc (topological sort) | ✅ Xong |
 
 ## Công nghệ
 
@@ -31,13 +31,14 @@ Bài tập Gen2-AI: 4 tình huống doanh nghiệp ghép thành **một ứng d�
 │   │   └── modules/
 │   │       ├── tickets/         # Bài 01: schemas, validation, extractor, algo, store, router
 │   │       ├── docks/           # Bài 02: cùng cấu trúc, thêm entities (bảng cửa kho, lịch đặt)
-│   │       └── expenses/        # Bài 03: cùng cấu trúc, thêm pdf.py (lấy chữ từ PDF)
-│   ├── samples/                 # tickets.json, docks.json, expenses.json (+ PDF mẫu): dữ liệu mẫu cho chế độ mock
+│   │       ├── expenses/        # Bài 03: cùng cấu trúc, thêm pdf.py (lấy chữ từ PDF)
+│   │       └── plans/           # Bài 04: cùng cấu trúc, entities lưu mỗi lần tính thứ tự
+│   ├── samples/                 # tickets.json, docks.json, expenses.json (+ PDF mẫu), plans.json: dữ liệu mẫu cho chế độ mock
 │   ├── supabase/schema.sql      # tạo bảng trên Supabase
 │   └── tests/
 ├── frontend/
 │   ├── app/                     # trang chính + proxy /api -> FastAPI
-│   ├── components/              # TicketWorkspace, DockWorkspace, ExpenseWorkspace, RunHistory, ui
+│   ├── components/              # TicketWorkspace, DockWorkspace, ExpenseWorkspace, PlanWorkspace, RunHistory, ui
 │   └── lib/                     # api.ts, types.ts
 └── docs/                        # tài liệu, JSON Schema, ảnh chụp từng bài
 ```
@@ -96,8 +97,8 @@ cd backend
 myenv/bin/python -m pytest -q
 ```
 
-Hiện có 486 test, chạy trong khoảng 3 giây. Test không gọi GenAI và không cần Supabase (dùng mock và SQLite tạm).
+Hiện có 821 test, chạy trong khoảng 5 giây. Test không gọi GenAI và không cần Supabase (dùng mock và SQLite tạm).
 
 ## Dữ liệu
 
-Mọi tin nhắn, chứng từ và tên công ty trong `samples/` đều là dữ liệu giả để học. Không gửi chứng từ hay thông tin cá nhân thật lên dịch vụ AI.
+Mọi tin nhắn, chứng từ, biên bản họp và tên công ty trong `samples/` đều là dữ liệu giả để học. Không gửi chứng từ hay thông tin cá nhân thật lên dịch vụ AI.

@@ -123,6 +123,22 @@ create table if not exists public.expense_reviews (
 
 create index if not exists ix_expense_reviews_submission_id on public.expense_reviews (submission_id);
 
+-- Bài 04: mỗi lần tính thứ tự công việc
+create table if not exists public.plan_orders (
+  id bigserial primary key,
+  run_id bigint not null references public.runs(id) on delete cascade,  -- lần extract biên bản
+  version integer not null check (version >= 1),  -- lần tính thứ mấy của biên bản này
+  tasks jsonb not null,                        -- [{id, title, owner}] mã T01…
+  dependencies jsonb not null,                 -- [{before, after, evidence}] đã bỏ dòng ghi lặp
+  status varchar(20) not null check (status in ('ordered', 'cycle_detected')),
+  result jsonb not null,                       -- thứ tự kèm lý do, hoặc vòng và các việc bị kẹt
+  warnings jsonb not null,                     -- cảnh báo lúc tính (không chặn)
+  created_at timestamptz not null default now()
+);
+
+create index if not exists ix_plan_orders_run_id on public.plan_orders (run_id);
+create index if not exists ix_plan_orders_status on public.plan_orders (status);
+
 -- Bật Row Level Security: chặn truy cập trực tiếp qua Supabase API bằng anon key.
 -- Backend kết nối bằng user postgres nên không bị ảnh hưởng.
 alter table public.runs enable row level security;
@@ -133,3 +149,4 @@ alter table public.dock_requests enable row level security;
 alter table public.dock_bookings enable row level security;
 alter table public.expense_submissions enable row level security;
 alter table public.expense_reviews enable row level security;
+alter table public.plan_orders enable row level security;
