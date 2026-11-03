@@ -94,7 +94,7 @@ cd backend
 myenv/bin/python -m pytest -q
 ```
 
-Hiện có 252 test, chạy trong khoảng 1 giây. Test không gọi GenAI và không cần Supabase (dùng mock và SQLite tạm).
+Hiện có 260 test, chạy trong khoảng 1 giây. Test không gọi GenAI và không cần Supabase (dùng mock và SQLite tạm).
 
 ## Dữ liệu
 

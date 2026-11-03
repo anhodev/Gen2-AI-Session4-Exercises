@@ -11,7 +11,7 @@ from app.core.runs import create_run
 from app.modules.tickets.algo import DuplicateTicketError
 from app.modules.tickets.entities import Ticket
 from app.modules.tickets.schemas import TicketExtraction
-from app.modules.tickets.store import load_queue, mark_done, save_ticket
+from app.modules.tickets.store import load_queue, mark_done, new_ticket_id, save_ticket
 
 VN = timezone(timedelta(hours=7))
 
@@ -144,3 +144,13 @@ def test_duplicate_of_done_ticket_is_still_rejected(db):
     mark_done(db, "T01")
     with pytest.raises(DuplicateTicketError):
         save_ticket(db, extraction("T01", "high"), at(10, 0))
+
+
+def test_new_ticket_ids_are_sequential(db):
+    assert [new_ticket_id(db) for _ in range(3)] == ["T01", "T02", "T03"]
+
+
+def test_new_ticket_id_skips_existing_ticket(db):
+    # T02 đã có sẵn (vd nhập tay trước đây) -> bộ sinh mã bỏ qua, không cấp trùng
+    save_ticket(db, extraction("T02", "high"), at(9))
+    assert [new_ticket_id(db) for _ in range(2)] == ["T01", "T03"]

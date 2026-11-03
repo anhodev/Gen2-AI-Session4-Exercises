@@ -223,7 +223,7 @@ def test_unknown_run_is_404(client):
 def test_ticket_run_cannot_be_used_for_docks(client):
     ticket = load_samples("tickets")[0]
     run_id = client.post("/tickets/extract", json={
-        "ticket_id": ticket["ticket_id"], "received_at": ticket["received_at"], "message": ticket["input"],
+        "received_at": ticket["received_at"], "message": ticket["input"],
     }).json()["run_id"]
     data = extract(client, "R01")
     assert suggest(client, {**data, "run_id": run_id}).status_code == 404

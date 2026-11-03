@@ -118,7 +118,7 @@ def test_non_object_output_is_error():
 
 def test_received_at_without_timezone_is_rejected():
     with pytest.raises(ValidationError) as exc:
-        ExtractRequest(ticket_id="T01", received_at="2026-10-21T09:00:00", message="Tôi bị trừ tiền 2 lần")
+        ExtractRequest(received_at="2026-10-21T09:00:00", message="Tôi bị trừ tiền 2 lần")
     assert exc.value.errors()[0]["type"] == "timezone_aware"
 
 

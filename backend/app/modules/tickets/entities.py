@@ -1,14 +1,25 @@
-"""Bài 01 - Bảng tickets: các ticket đã được nhân viên xác nhận."""
+"""Bài 01 - Bảng ticket_numbers (cấp mã) và tickets (ticket đã được nhân viên xác nhận)."""
 
 from __future__ import annotations
 
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, String
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.database import Base
 from app.core.entities import now_utc
+
+
+class TicketNumber(Base):
+    """Mã ticket do backend cấp cho mỗi tin nhắn: T01, T02..."""
+
+    __tablename__ = "ticket_numbers"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)  # số tự tăng, dùng để sinh mã
+    ticket_id: Mapped[str | None] = mapped_column(String(50), unique=True, nullable=True)
+    run_id: Mapped[int | None] = mapped_column(ForeignKey("runs.id", ondelete="SET NULL"), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc)
 
 
 class Ticket(Base):

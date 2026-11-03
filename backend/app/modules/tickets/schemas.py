@@ -64,9 +64,8 @@ class TicketExtraction(BaseModel):
 
 # 2. API
 class ExtractRequest(BaseModel):
-    """POST /tickets/extract: hệ thống đã biết mã và giờ nhận, GenAI đọc phần còn lại."""
+    """POST /tickets/extract: giờ nhận và tin nhắn. Mã ticket do backend tự cấp."""
 
-    ticket_id: str = Field(min_length=1, max_length=50)
     # AwareDatetime: Pydantic tự từ chối thời gian không có múi giờ.
     received_at: AwareDatetime
     message: str = Field(min_length=1, max_length=5000)
@@ -74,7 +73,7 @@ class ExtractRequest(BaseModel):
 
 class ExtractResponse(BaseModel):
     run_id: int | None = None  # mã lần xử lý, gửi lại ở bước confirm
-    ticket_id: str
+    ticket_id: str            # mã backend vừa cấp
     received_at: datetime
     llm_output: dict | None   # JSON GenAI trả về, giữ nguyên để người dùng xem
     issues: list[Issue]       # lỗi và cảnh báo sau khi code kiểm tra

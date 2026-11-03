@@ -17,9 +17,11 @@ const SEVERITIES: Severity[] = ["critical", "high", "medium", "low"];
 const SUMMARY_MAX = 200;
 const FORM_FIELDS = ["ticket_id", "intent", "severity", "product", "summary", "needs_human_review"];
 
-/** Bản người dùng đang sửa. Giữ dạng chuỗi để hiện được cả giá trị sai GenAI trả (vd "urgent"). */
+/**
+ * Bản người dùng đang sửa. Giữ dạng chuỗi để hiện được cả giá trị sai GenAI trả (vd "urgent").
+ * Không có ticket_id: mã do backend cấp, người dùng không sửa được.
+ */
 interface Draft {
-  ticket_id: string;
   intent: string;
   severity: string;
   product: string;
@@ -27,10 +29,9 @@ interface Draft {
   needs_human_review: boolean;
 }
 
-function toDraft(raw: Record<string, unknown> | null, ticketId: string): Draft {
+function toDraft(raw: Record<string, unknown> | null): Draft {
   const text = (value: unknown) => (value === null || value === undefined ? "" : String(value));
   return {
-    ticket_id: text(raw?.ticket_id ?? ticketId),
     intent: text(raw?.intent),
     severity: text(raw?.severity),
     product: text(raw?.product),
@@ -42,7 +43,7 @@ function toDraft(raw: Record<string, unknown> | null, ticketId: string): Draft {
 export default function TicketWorkspace({ llmMode }: { llmMode: string }) {
   // Bước 1: nhập
   const [samples, setSamples] = useState<Sample[]>([]);
-  const [input, setInput] = useState({ ticket_id: "T01", received_at: nowVietnamIso(), message: "" });
+  const [input, setInput] = useState({ received_at: nowVietnamIso(), message: "" });
   const [inputIssues, setInputIssues] = useState<Issue[]>([]);
   const [extracting, setExtracting] = useState(false);
 
@@ -72,7 +73,7 @@ export default function TicketWorkspace({ llmMode }: { llmMode: string }) {
   useEffect(() => { loadQueue(); }, [loadQueue]);
 
   const pickSample = (sample: Sample) => {
-    setInput({ ticket_id: sample.ticket_id, received_at: sample.received_at, message: sample.message });
+    setInput({ received_at: sample.received_at, message: sample.message });
     setInputIssues([]);
     setExtraction(null);
     setDraft(null);
@@ -86,7 +87,7 @@ export default function TicketWorkspace({ llmMode }: { llmMode: string }) {
     try {
       const result = await api.extract(input);
       setExtraction(result);
-      setDraft(toDraft(result.llm_output, result.ticket_id));
+      setDraft(toDraft(result.llm_output));
       setIssues(result.issues);
     } catch (error) {
       const err = error as ApiError;
@@ -102,6 +103,7 @@ export default function TicketWorkspace({ llmMode }: { llmMode: string }) {
     try {
       const result = await api.confirm(extraction.run_id, {
         ...draft,
+        ticket_id: extraction.ticket_id, // luôn gửi mã hệ thống đã cấp, không lấy mã GenAI trả
         intent: draft.intent as Intent,
         severity: draft.severity as Severity,
         product: draft.product.trim() ? draft.product : null, // ô trống -> null
@@ -132,7 +134,7 @@ export default function TicketWorkspace({ llmMode }: { llmMode: string }) {
 
   const issuesFor = (field: string) => issues.filter((i) => i.field === field);
   const generalIssues = issues.filter((i) => !FORM_FIELDS.includes(i.field));
-  const original = useMemo(() => (extraction ? toDraft(extraction.llm_output, extraction.ticket_id) : null), [extraction]);
+  const original = useMemo(() => (extraction ? toDraft(extraction.llm_output) : null), [extraction]);
   const edited = (field: keyof Draft) => Boolean(original && draft && original[field] !== draft[field]);
   const update = (patch: Partial<Draft>) => setDraft((d) => (d ? { ...d, ...patch } : d));
   const head = queue?.items[0];
@@ -149,23 +151,22 @@ export default function TicketWorkspace({ llmMode }: { llmMode: string }) {
       <div className="work-grid">
         {/* Bước 1 */}
         <section className="panel">
-          <PanelHeader step={1} title="Nhập tin nhắn" subtitle="Hệ thống cấp mã ticket và giờ nhận. GenAI chỉ đọc nội dung." />
+          <PanelHeader step={1} title="Nhập tin nhắn" subtitle="Backend tự cấp mã ticket khi gửi. GenAI chỉ đọc nội dung." />
           <div className="panel-body">
             {samples.length > 0 && (
               <div className="field">
                 <label>Tin nhắn mẫu {llmMode === "mock" && <em>chế độ mock chỉ đọc được các mẫu này</em>}</label>
                 <div className="suggestions">
                   {samples.map((s) => (
-                    <button key={s.ticket_id} title={s.note} onClick={() => pickSample(s)} className={clsx(s.label.includes("[Lỗi]") && "bad")}>{s.label}</button>
+                    <button key={s.label} title={s.note} onClick={() => pickSample(s)} className={clsx(s.label.includes("[Lỗi]") && "bad")}>{s.label}</button>
                   ))}
                 </div>
               </div>
             )}
             <div className="form-row">
               <div className="field">
-                <label>Mã ticket (hệ thống cấp)</label>
-                <input value={input.ticket_id} onChange={(e) => setInput({ ...input, ticket_id: e.target.value })} />
-                <FieldIssues issues={inputIssues.filter((i) => i.field === "ticket_id")} />
+                <label>Mã ticket (backend cấp)</label>
+                <input value={extraction?.ticket_id ?? ""} placeholder="Tự cấp khi bấm gửi" readOnly disabled />
               </div>
               <div className="field">
                 <label>Nhận lúc (ISO, có múi giờ)</label>
@@ -176,7 +177,7 @@ export default function TicketWorkspace({ llmMode }: { llmMode: string }) {
             <div className="field">
               <label>Tin nhắn của khách</label>
               <textarea rows={5} value={input.message} onChange={(e) => setInput({ ...input, message: e.target.value })} placeholder="Ví dụ: Tôi bị trừ tiền hai lần khi thanh toán..." />
-              <FieldIssues issues={inputIssues.filter((i) => !["ticket_id", "received_at"].includes(i.field))} />
+              <FieldIssues issues={inputIssues.filter((i) => i.field !== "received_at")} />
             </div>
             <button className="primary-button" onClick={runExtract} disabled={extracting || !input.message.trim()}>
               {extracting ? <Loader2 className="spin" size={16} /> : <Sparkles size={16} />} GenAI đọc tin nhắn
@@ -193,6 +194,7 @@ export default function TicketWorkspace({ llmMode }: { llmMode: string }) {
             ) : (
               <>
                 <div className="run-meta">
+                  <span>mã <strong>{extraction.ticket_id}</strong></span>
                   <span>run #{extraction.run_id}</span>
                   <span>nhận lúc {shortTime(extraction.received_at)}</span>
                   <span className={clsx("pill", extraction.can_confirm ? "green" : "red")}>
@@ -202,8 +204,8 @@ export default function TicketWorkspace({ llmMode }: { llmMode: string }) {
                 <FieldIssues issues={generalIssues} />
 
                 <div className="form-row">
-                  <Field label="ticket_id" edited={edited("ticket_id")} issues={issuesFor("ticket_id")}>
-                    <input value={draft.ticket_id} onChange={(e) => update({ ticket_id: e.target.value })} />
+                  <Field label="ticket_id (backend cấp, khóa)" edited={false} issues={issuesFor("ticket_id")}>
+                    <input value={extraction.ticket_id} readOnly disabled title="Mã do backend cấp. Nếu GenAI trả mã khác, hệ thống vẫn dùng mã này." />
                   </Field>
                   <Field label="intent" edited={edited("intent")} issues={issuesFor("intent")}>
                     <Select value={draft.intent} options={INTENTS} onChange={(intent) => update({ intent })} />

@@ -19,14 +19,14 @@ export interface TicketExtraction {
 }
 
 export interface ExtractRequest {
-  ticket_id: string;
+  // Không có ticket_id: backend tự cấp
   received_at: string; // ISO 8601, bắt buộc có múi giờ, ví dụ 2026-10-21T09:00:00+07:00
   message: string;
 }
 
 export interface ExtractResponse {
   run_id: number | null;
-  ticket_id: string;
+  ticket_id: string; // mã backend vừa cấp
   received_at: string;
   llm_output: Record<string, unknown> | null; // JSON GenAI trả về, có thể sai khuôn
   issues: Issue[];
@@ -63,7 +63,6 @@ export interface QueueResponse {
 export interface Sample {
   label: string;
   note: string;
-  ticket_id: string;
   received_at: string;
   message: string;
 }

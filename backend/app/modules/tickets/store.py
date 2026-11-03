@@ -17,11 +17,45 @@ from app.core.entities import Run, now_utc
 from app.core.runs import mark_confirmed, mark_rejected
 
 from .algo import SLA, DuplicateTicketError, QueuedTicket, TicketQueue, make_ticket
-from .entities import Ticket
+from .entities import Ticket, TicketNumber
 from .schemas import TicketExtraction
 
 
-def save_ticket(db: Session, data: TicketExtraction, received_at: datetime, run: Run | None = None) -> QueuedTicket:
+def new_ticket_id(db: Session) -> str:
+    """
+    Sinh mã ticket mới: T01, T02... theo số tự tăng của database (quá 99 thì thành T100).
+
+    Bỏ qua mã đã có trong bảng tickets (vd ticket nhập tay từ trước khi backend tự cấp mã).
+
+    Returns:
+        str: Mã ticket.
+    """
+    while True:
+        number = TicketNumber(created_at=now_utc())
+        db.add(number)
+        db.flush()  # lấy id tự tăng trước khi commit
+        ticket_id = f"T{number.id:02d}"
+        if db.get(Ticket, ticket_id) is None:
+            number.ticket_id = ticket_id
+            db.commit()
+            return ticket_id
+
+
+def attach_run(db: Session, ticket_id: str, run: Run) -> None:
+    """Ghi lại lần extract tương ứng với mã ticket."""
+    number = db.scalar(select(TicketNumber).where(TicketNumber.ticket_id == ticket_id))
+    if number is not None:
+        number.run_id = run.id
+        db.commit()
+
+
+def save_ticket(
+    db: Session,
+    data: TicketExtraction,
+    received_at: datetime,
+    run: Run | None = None,
+    baseline: dict | None = None,
+) -> QueuedTicket:
     """
     Lưu ticket người dùng đã xác nhận và ghi kết quả vào lịch sử.
 
@@ -30,6 +64,8 @@ def save_ticket(db: Session, data: TicketExtraction, received_at: datetime, run:
         data (TicketExtraction): Bản người dùng đã xem/sửa.
         received_at (datetime): Thời điểm hệ thống nhận tin nhắn, có múi giờ.
         run (Run | None, optional): Lần extract tương ứng. Defaults to None.
+        baseline (dict | None, optional): Bản để so tìm ô người dùng đã sửa.
+            Defaults to None (so với JSON GenAI trả).
 
     Raises:
         DuplicateTicketError: Mã ticket đã tồn tại.
@@ -65,7 +101,7 @@ def save_ticket(db: Session, data: TicketExtraction, received_at: datetime, run:
         mark_confirmed(run, user_output, result={
             "deadline_at": queued.deadline_at.isoformat(),
             "sla_minutes": int(SLA[data.severity].total_seconds() // 60),
-        })
+        }, baseline=baseline)
 
     # Ghi ticket và lịch sử trong cùng một lần commit
     try:

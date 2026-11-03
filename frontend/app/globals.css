@@ -87,6 +87,7 @@ code { font-family:ui-monospace, SFMono-Regular, Menlo, monospace; font-size:.92
 .field label em { font-style:normal; font-weight:500; color:var(--muted); }
 .field input, .field textarea, .field select { width:100%; border:1px solid #ddd9e2; border-radius:9px; padding:9px 11px; background:#fff; color:var(--ink); outline:none; }
 .field textarea { resize:vertical; line-height:1.5; }
+.field input:disabled { background:#f4f2f7; color:var(--muted); cursor:not-allowed; }
 .field input:focus, .field textarea:focus, .field select:focus { border-color:#a493ff; box-shadow:0 0 0 3px #6c4ff81f; }
 .field.has-error input, .field.has-error textarea, .field.has-error select, textarea.too-long { border-color:#ef9aa5; background:#fffafa; }
 .checkbox { display:flex; align-items:center; gap:8px; font-size:13px; font-weight:600; color:#55515c; }

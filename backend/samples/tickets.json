@@ -1,12 +1,11 @@
 [
   {
-    "label": "T01 - Bị tính tiền hai lần",
+    "label": "Mẫu 1 - Bị tính tiền hai lần",
     "note": "Ví dụ trong đề, mức high",
-    "ticket_id": "T01",
     "received_at": "2026-10-21T09:00:00+07:00",
     "input": "Chào shop, sáng nay tôi thanh toán đơn hàng ở trang checkout mà tài khoản ngân hàng bị trừ tiền hai lần. Nhờ kiểm tra và hoàn lại giúp tôi.",
     "llm_output": {
-      "ticket_id": "T01",
+      "ticket_id": "{ticket_id}",
       "intent": "billing",
       "severity": "high",
       "product": "checkout",
@@ -15,13 +14,12 @@
     }
   },
   {
-    "label": "T02 - Không thanh toán được",
+    "label": "Mẫu 2 - Không thanh toán được",
     "note": "Ví dụ trong đề, mức critical, hạn 09:50",
-    "ticket_id": "T02",
     "received_at": "2026-10-21T09:20:00+07:00",
     "input": "Từ 9 giờ tới giờ không ai trong công ty tôi thanh toán được, bấm nút Thanh toán là báo lỗi 500. Chúng tôi đang mất đơn liên tục!",
     "llm_output": {
-      "ticket_id": "T02",
+      "ticket_id": "{ticket_id}",
       "intent": "technical",
       "severity": "critical",
       "product": "checkout",
@@ -30,13 +28,12 @@
     }
   },
   {
-    "label": "T03 - File hóa đơn lỗi font",
+    "label": "Mẫu 3 - File hóa đơn lỗi font",
     "note": "Ví dụ trong đề, mức medium",
-    "ticket_id": "T03",
     "received_at": "2026-10-21T08:30:00+07:00",
     "input": "File PDF hóa đơn tải về bị lỗi font tiếng Việt, tôi tạm chụp màn hình gửi kế toán được nhưng mong sửa sớm.",
     "llm_output": {
-      "ticket_id": "T03",
+      "ticket_id": "{ticket_id}",
       "intent": "technical",
       "severity": "medium",
       "product": "invoice",
@@ -45,13 +42,12 @@
     }
   },
   {
-    "label": "T04 - Tài khoản bị khóa (nhận 07:00)",
+    "label": "Mẫu 4 - Tài khoản bị khóa (nhận 07:00)",
     "note": "Thêm vào sau 3 ticket trên: hạn 09:00 nên lên đầu hàng đợi",
-    "ticket_id": "T04",
     "received_at": "2026-10-21T07:00:00+07:00",
     "input": "Tài khoản admin của tôi bị khóa sau khi nhập sai mật khẩu, 9 giờ tôi cần vào hệ thống để duyệt đơn cho cả nhóm.",
     "llm_output": {
-      "ticket_id": "T04",
+      "ticket_id": "{ticket_id}",
       "intent": "account",
       "severity": "high",
       "product": null,
@@ -60,13 +56,12 @@
     }
   },
   {
-    "label": "T05 - Tin nhắn mơ hồ",
+    "label": "Mẫu 5 - Tin nhắn mơ hồ",
     "note": "GenAI chọn intent=other, needs_human_review=true -> cảnh báo, vẫn xác nhận được",
-    "ticket_id": "T05",
     "received_at": "2026-10-21T10:00:00+07:00",
     "input": "Cái đó lại bị nữa rồi, làm ơn xem giúp.",
     "llm_output": {
-      "ticket_id": "T05",
+      "ticket_id": "{ticket_id}",
       "intent": "other",
       "severity": "low",
       "product": null,
@@ -75,13 +70,12 @@
     }
   },
   {
-    "label": "T06 - [Lỗi] GenAI trả severity lạ",
+    "label": "Mẫu 6 - [Lỗi] GenAI trả severity lạ",
     "note": "Giả lập GenAI trả 'urgent' (không có trong danh sách) -> bị chặn, người dùng phải sửa",
-    "ticket_id": "T06",
     "received_at": "2026-10-21T10:15:00+07:00",
     "input": "Ứng dụng trên điện thoại cứ mở lên là tự thoát, tôi không xem được đơn hàng.",
     "llm_output": {
-      "ticket_id": "T06",
+      "ticket_id": "{ticket_id}",
       "intent": "technical",
       "severity": "urgent",
       "product": "mobile app",
@@ -90,9 +84,8 @@
     }
   },
   {
-    "label": "T07 - [Lỗi] GenAI trả sai mã ticket",
-    "note": "Giả lập GenAI tự đổi mã thành T70 -> JSON đúng khuôn nhưng sai nội dung",
-    "ticket_id": "T07",
+    "label": "Mẫu 7 - [Lỗi] GenAI trả sai mã ticket",
+    "note": "Giả lập GenAI tự đặt mã T70 thay vì chép mã hệ thống cấp -> JSON đúng khuôn nhưng sai nội dung",
     "received_at": "2026-10-21T10:30:00+07:00",
     "input": "Cho tôi hỏi cách đổi email nhận thông báo trong phần cài đặt.",
     "llm_output": {

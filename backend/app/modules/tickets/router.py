@@ -1,6 +1,6 @@
 """Bài 01 - API hàng đợi ticket.
 
-  POST /tickets/extract   GenAI đọc tin nhắn, code kiểm tra, lưu lịch sử. CHƯA vào hàng đợi.
+  POST /tickets/extract   Backend cấp mã ticket, GenAI đọc tin nhắn, code kiểm tra, lưu lịch sử. CHƯA vào hàng đợi.
   POST /tickets/confirm   Người dùng xác nhận bản đã sửa -> code tính deadline -> vào hàng đợi.
   GET  /tickets/queue     Xem top K, không làm thay đổi hàng đợi.
   POST /tickets/next      Lấy ticket kế tiếp ra xử lý.
@@ -35,7 +35,7 @@ from .schemas import (
     QueueItem,
     QueueResponse,
 )
-from .store import mark_done, save_ticket
+from .store import attach_run, mark_done, new_ticket_id, save_ticket
 from .validation import has_errors, validate_extraction
 
 router = APIRouter(prefix="/tickets", tags=["Bài 01 - Tickets"])
@@ -47,13 +47,12 @@ def list_samples():
     Tin nhắn mẫu để chạy thử ở chế độ mock (không tốn tiền gọi model).
 
     Returns:
-        list[dict]: Mỗi mẫu gồm label, note, ticket_id, received_at, message.
+        list[dict]: Mỗi mẫu gồm label, note, received_at, message.
     """
     return [
         {
             "label": s["label"],
             "note": s.get("note", ""),
-            "ticket_id": s["ticket_id"],
             "received_at": s["received_at"],
             "message": s["input"],
         }
@@ -68,24 +67,27 @@ def extract(
     settings: Settings = Depends(get_app_settings),
 ):
     """
-    GenAI đọc tin nhắn và điền mẫu JSON, code kiểm tra kết quả.
+    Cấp mã ticket, cho GenAI đọc tin nhắn và điền mẫu JSON, code kiểm tra kết quả.
 
     Args:
-        payload (ExtractRequest): Mã ticket, giờ nhận (có múi giờ) và tin nhắn.
+        payload (ExtractRequest): Giờ nhận (có múi giờ) và tin nhắn.
 
     Returns:
-        ExtractResponse: JSON GenAI trả về, danh sách lỗi/cảnh báo, run_id để xác nhận.
+        ExtractResponse: Mã ticket, JSON GenAI trả về, danh sách lỗi/cảnh báo, run_id để xác nhận.
     """
-    response, result = extract_ticket(payload, settings)
+    # Mã ticket do backend cấp, không nhận từ trình duyệt và không để GenAI tự đặt
+    ticket_id = new_ticket_id(db)
+    response, result = extract_ticket(payload, ticket_id, settings)
 
     # Lưu nội dung gốc, JSON GenAI trả, lỗi/cảnh báo và thời gian xử lý
     run = create_run(
         db,
         module=TASK,
-        raw_input=payload.model_dump(mode="json"),
+        raw_input={**payload.model_dump(mode="json"), "ticket_id": ticket_id},
         llm_result=result,
         issues=[i.model_dump() for i in response.issues],
     )
+    attach_run(db, ticket_id, run)
     response.run_id = run.id
     return response
 
@@ -126,10 +128,14 @@ def confirm(
     if has_errors(issues):
         raise HTTPException(status_code=400, detail=[i.model_dump() for i in issues])
 
+    # Mã ticket người dùng không sửa được: GenAI trả mã sai thì hệ thống thay,
+    # nên khi tìm ô đã sửa, coi như GenAI đã trả đúng mã hệ thống
+    baseline = {**run.llm_output, "ticket_id": system_ticket_id} if isinstance(run.llm_output, dict) else None
+
     # Lưu database + thêm vào heap trong cùng một khóa
     with request.app.state.ticket_lock:
         try:
-            queued = save_ticket(db, payload.ticket, received_at, run)
+            queued = save_ticket(db, payload.ticket, received_at, run, baseline=baseline)
         except DuplicateTicketError as exc:
             raise HTTPException(status_code=409, detail=str(exc))
         except TicketError as exc:

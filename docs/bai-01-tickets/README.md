@@ -8,10 +8,11 @@ Nhóm chăm sóc khách hàng nhận nhiều tin nhắn cùng lúc. App đọc t
 
 | Bước | Ai làm | Việc cụ thể |
 |---|---|---|
-| Cấp mã ticket và giờ nhận | Hệ thống | `ticket_id`, `received_at` (bắt buộc có múi giờ) |
+| Cấp mã ticket | **Backend** | Tự sinh `T01`, `T02`... theo số tự tăng trong database. Trình duyệt không gửi mã, UI không sửa được mã |
+| Giờ nhận | Hệ thống | `received_at` (bắt buộc có múi giờ) |
 | Đọc tin nhắn | **GenAI** | Điền `intent`, `severity`, `product`, `summary`, `needs_human_review` vào mẫu JSON |
 | Kiểm tra kết quả GenAI | **Code** | Đúng khuôn chưa (Pydantic), có trùng mã hệ thống đã cấp không, có cần người xem lại không |
-| Xem và sửa | Nhân viên | Sửa ô GenAI đọc sai, rồi bấm xác nhận |
+| Xem và sửa | Nhân viên | Sửa ô GenAI đọc sai (trừ `ticket_id`), rồi bấm xác nhận |
 | Tính hạn xử lý (SLA) | **Code** | `deadline = received_at + SLA[severity]`. GenAI **không** đoán hạn |
 | Xếp hàng đợi, giải thích thứ tự | **Code** | Min-heap theo khóa `(deadline_at, -severity_rank, received_at, ticket_id)` |
 
@@ -41,7 +42,7 @@ Mẫu được định nghĩa bằng Pydantic tại [`schemas.py`](../../backend
 
 | Ô | Kiểu | Quy tắc |
 |---|---|---|
-| `ticket_id` | string | Phải đúng mã hệ thống đã cấp |
+| `ticket_id` | string | Phải chép đúng mã backend đã cấp (có trong prompt), không tự đặt mã |
 | `intent` | enum | `billing`, `technical`, `account`, `other` |
 | `severity` | enum | `low`, `medium`, `high`, `critical` |
 | `product` | string \| null | `null` nếu khách không nhắc sản phẩm nào. Vẫn là ô bắt buộc, GenAI phải ghi rõ `null` |
@@ -79,7 +80,7 @@ Tất cả lỗi được gom vào một danh sách, mỗi lỗi gắn với tê
 
 **Lý do xếp hạng:** so ticket với ticket đứng ngay sau nó, đi lần lượt qua từng phần của khóa. Phần đầu tiên khác nhau chính là lý do, ví dụ "hạn sớm hơn T01", hoặc "cùng hạn với T05 nhưng khẩn cấp hơn".
 
-**Mã trùng:** từ chối với lỗi 409, không ghi đè. Quy tắc này áp dụng cả với mã đã được lấy ra xử lý. Có 2 lớp chặn: `TicketQueue` trong bộ nhớ, và khóa chính `ticket_id` trong database (chặn cả trường hợp hai người cùng xác nhận một lúc).
+**Mã trùng:** mã do backend cấp từ số tự tăng nên qua API bình thường không thể trùng. Gửi lại cùng một tin nhắn sẽ ra ticket mới với mã mới. Code vẫn giữ 2 lớp chặn phòng khi dữ liệu bị ghi sai: `TicketQueue` trong bộ nhớ, và khóa chính `ticket_id` trong database. Trùng thì từ chối với lỗi 409, không ghi đè, kể cả với mã đã được lấy ra xử lý.
 
 **Ghi chú:** cùng mức khẩn cấp thì cùng SLA. Vì vậy hai ticket có cùng hạn và cùng mức thì chắc chắn được nhận cùng lúc. Luật thứ 3 "nhận trước" đã được phần deadline quyết định thay, nên trên thực tế không bao giờ là yếu tố phân định. Code vẫn giữ đủ khóa như đề, phòng khi sau này SLA thay đổi (ví dụ mỗi khách hàng có SLA riêng).
 
@@ -91,27 +92,29 @@ Tất cả lỗi được gom vào một danh sách, mỗi lỗi gắn với tê
 | T02 | 09:20 +07:00 | critical | 09:50 |
 | T03 | 08:30 +07:00 | medium | 16:30 |
 
-Kết quả: **T02 → T01 → T03**, top 2 là T02, T01. Thêm T04 (high, nhận 07:00, hạn 09:00) thì T04 lên đầu: **T04 → T02 → T01 → T03**.
+Gửi lần lượt mẫu 1, 2, 3 thì backend cấp đúng mã T01, T02, T03 như đề. Kết quả: **T02 → T01 → T03**, top 2 là T02, T01. Thêm T04 (high, nhận 07:00, hạn 09:00) thì T04 lên đầu: **T04 → T02 → T01 → T03**.
 
 ## 4. API
 
 | Endpoint | Việc làm | Lỗi |
 |---|---|---|
-| `POST /tickets/extract` | GenAI đọc tin nhắn, code kiểm tra, lưu lịch sử. Trả `run_id`. **Chưa** vào hàng đợi | 422 thời gian thiếu múi giờ |
+| `POST /tickets/extract` | Nhận `received_at` và `message`. Backend cấp mã ticket, GenAI đọc tin nhắn, code kiểm tra, lưu lịch sử. Trả `ticket_id` và `run_id`. **Chưa** vào hàng đợi | 422 thời gian thiếu múi giờ |
 | `POST /tickets/confirm` | Nhận `run_id` và bản đã sửa. Kiểm tra lại, tính deadline, đưa vào heap | 422 sai khuôn, 400 sai mã ticket, 404 không thấy run, 409 trùng mã hoặc run đã được xác nhận |
 | `GET /tickets/queue?limit=K` | Top K kèm lý do xếp hạng, không lấy ticket ra | 422 nếu K nằm ngoài khoảng 1–100 |
 | `POST /tickets/next` | Lấy ticket đầu hàng đợi, đánh dấu `done` | 404 nếu hàng đợi trống |
-| `GET /tickets/samples` | Tin nhắn mẫu cho chế độ mock | |
+| `GET /tickets/samples` | Tin nhắn mẫu cho chế độ mock (không kèm mã ticket) | |
 | `GET /runs?module=tickets`, `GET /runs/{id}` | Lịch sử xử lý | |
 | `GET /health` | Đang dùng mock hay model nào, Supabase hay SQLite | |
 
-Ở bước confirm, mã ticket và giờ nhận được **lấy lại từ lần extract** (qua `run_id`), không lấy từ trình duyệt. Người dùng chỉ sửa được phần GenAI đọc ra.
+**Mã ticket do backend cấp.** Ở bước extract, trình duyệt chỉ gửi giờ nhận và tin nhắn. Nếu gửi kèm `ticket_id` thì backend bỏ qua. Mã mới được ghi vào bảng `ticket_numbers` (bỏ qua mã đã có trong bảng `tickets`, ví dụ ticket nhập tay từ trước), đưa vào prompt để GenAI chép lại, và lưu trong `runs.raw_input`.
+
+Ở bước confirm, mã ticket và giờ nhận được **lấy lại từ lần extract** (qua `run_id`), không lấy từ trình duyệt. Trên UI, ô `ticket_id` bị khóa và luôn gửi mã hệ thống. Nếu ai đó gọi thẳng API với mã khác thì nhận lỗi 400. Khi GenAI trả sai mã (mẫu 7), lỗi vẫn hiện ra, nhưng người dùng xác nhận được với mã hệ thống. Việc thay mã này **không** bị tính là "người dùng đã sửa".
 
 Ví dụ gọi bằng `curl` (chế độ mock):
 
 ```bash
 curl -s -X POST localhost:8000/tickets/extract -H 'content-type: application/json' \
-  -d '{"ticket_id":"T02","received_at":"2026-10-21T09:20:00+07:00","message":"Từ 9 giờ tới giờ không ai trong công ty tôi thanh toán được, bấm nút Thanh toán là báo lỗi 500. Chúng tôi đang mất đơn liên tục!"}'
+  -d '{"received_at":"2026-10-21T09:20:00+07:00","message":"Từ 9 giờ tới giờ không ai trong công ty tôi thanh toán được, bấm nút Thanh toán là báo lỗi 500. Chúng tôi đang mất đơn liên tục!"}'
 ```
 
 ```bash
@@ -130,7 +133,7 @@ Mỗi lần xử lý là một dòng trong bảng `runs` ([`core/entities.py`](.
 | Kết quả cuối | `result`: deadline, SLA và `edited_fields` (các ô người dùng đã sửa) |
 | Thời gian xử lý | `latency_ms`, `created_at`, `confirmed_at` |
 
-Ticket đã xác nhận được lưu ở bảng `tickets`. Heap nằm trong bộ nhớ để thao tác nhanh. Khi app khởi động, `load_queue()` đọc các ticket còn `queued` và dựng lại heap, nên hàng đợi không mất khi restart.
+Mã đã cấp được lưu ở bảng `ticket_numbers` (số tự tăng, mã, `run_id`). Ticket đã xác nhận được lưu ở bảng `tickets`. Heap nằm trong bộ nhớ để thao tác nhanh. Khi app khởi động, `load_queue()` đọc các ticket còn `queued` và dựng lại heap, nên hàng đợi không mất khi restart.
 
 ## 6. Test
 
@@ -140,9 +143,9 @@ Chạy `cd backend && myenv/bin/python -m pytest -q`. Thuật toán được tes
 |---|---|---|
 | [`test_tickets_algo.py`](../../backend/tests/test_tickets_algo.py) | 20 | Thuật toán thuần: SLA, thứ tự, top K, phá hòa, dữ liệu sai |
 | [`test_tickets_validation.py`](../../backend/tests/test_tickets_validation.py) | 17 | Mẫu JSON và kiểm tra 2 lớp |
-| [`test_tickets_extractor.py`](../../backend/tests/test_tickets_extractor.py) | 12 | GenAI (mock) và từng mẫu trong `samples/tickets.json` |
-| [`test_tickets_store.py`](../../backend/tests/test_tickets_store.py) | 11 | Lưu lịch sử, múi giờ, dựng lại hàng đợi sau restart |
-| [`test_tickets_api.py`](../../backend/tests/test_tickets_api.py) | 24 | Toàn bộ API bằng `TestClient` |
+| [`test_tickets_extractor.py`](../../backend/tests/test_tickets_extractor.py) | 13 | GenAI (mock) và từng mẫu trong `samples/tickets.json` |
+| [`test_tickets_store.py`](../../backend/tests/test_tickets_store.py) | 13 | Lưu lịch sử, múi giờ, dựng lại hàng đợi sau restart, sinh mã ticket |
+| [`test_tickets_api.py`](../../backend/tests/test_tickets_api.py) | 29 | Toàn bộ API bằng `TestClient`, gồm cả việc backend cấp mã |
 
 Các test thuật toán, chia theo 3 nhóm đề yêu cầu:
 
@@ -156,32 +159,33 @@ Các test thuật toán, chia theo 3 nhóm đề yêu cầu:
 |---|---|
 | Thứ tự và top K đúng; xem top K không làm đổi lần lấy kế tiếp | `test_sample_order_and_top_k`, `test_viewing_top_k_does_not_change_next` |
 | Cùng hạn và cùng mức thì phân định theo giờ nhận, rồi mã ticket | `test_full_tie_falls_back_to_ticket_id`, `test_same_severity_earlier_received_first` |
-| Mã trùng, thời gian không có múi giờ, mức khẩn cấp sai: app báo rõ vấn đề | `test_duplicate_ticket_is_409_and_logged`, `test_received_at_without_timezone_is_422`, `test_bad_severity_from_genai_cannot_confirm` |
-| GenAI trả sai ID: báo lỗi, chưa đưa vào hàng đợi | `test_wrong_ticket_id_is_400` |
+| Mã trùng, thời gian không có múi giờ, mức khẩn cấp sai: app báo rõ vấn đề | `test_duplicate_id_is_rejected_and_logged`, `test_same_message_twice_gets_two_tickets`, `test_received_at_without_timezone_is_422`, `test_bad_severity_from_genai_cannot_confirm` |
+| GenAI trả sai ID: báo lỗi, chưa đưa vào hàng đợi | `test_wrong_ticket_id_is_400`, `test_wrong_ticket_id_confirmed_with_system_id` |
+| Mã ticket do backend cấp, người dùng không sửa được | `test_extract_generates_ticket_id_and_saves_run`, `test_ticket_ids_are_sequential`, `test_ticket_id_from_browser_is_ignored`, `test_tampered_ticket_id_is_400`, `test_new_ticket_id_skips_existing_ticket` |
 
 ## 7. Dữ liệu mẫu (chế độ mock)
 
-[`samples/tickets.json`](../../backend/samples/tickets.json) có 7 tin nhắn. Mỗi tin nhắn kèm JSON giả lập GenAI trả, nên chạy thử không tốn tiền gọi model:
+[`samples/tickets.json`](../../backend/samples/tickets.json) có 7 tin nhắn. Mỗi tin nhắn kèm JSON giả lập GenAI trả, nên chạy thử không tốn tiền gọi model. Mẫu không ghi sẵn mã ticket: ô `ticket_id` trong JSON giả lập là `"{ticket_id}"`, chế độ mock thay bằng mã backend vừa cấp.
 
 | Mẫu | Mục đích |
 |---|---|
-| T01, T02, T03 | Đúng ví dụ trong đề |
-| T04 | Nhận lúc 07:00, dùng để kiểm tra nó nhảy lên đầu hàng đợi |
-| T05 | Tin nhắn mơ hồ: cảnh báo `needs_human_review`, vẫn xác nhận được |
-| T06 | GenAI trả `severity: "urgent"`: bị chặn cho tới khi người dùng sửa |
-| T07 | GenAI trả `ticket_id: "T70"` thay vì `T07`: đúng khuôn nhưng sai nội dung |
+| Mẫu 1, 2, 3 | Đúng ví dụ trong đề (gửi theo thứ tự này sẽ được T01, T02, T03) |
+| Mẫu 4 | Nhận lúc 07:00, dùng để kiểm tra nó nhảy lên đầu hàng đợi |
+| Mẫu 5 | Tin nhắn mơ hồ: cảnh báo `needs_human_review`, vẫn xác nhận được |
+| Mẫu 6 | GenAI trả `severity: "urgent"`: bị chặn cho tới khi người dùng sửa |
+| Mẫu 7 | GenAI tự đặt `ticket_id: "T70"` thay vì chép mã backend cấp: đúng khuôn nhưng sai nội dung |
 
 ## 8. Ảnh chụp luồng chính
 
-**Bước 1–2: GenAI đọc tin nhắn T06, code phát hiện `severity` ngoài danh sách.** Lỗi hiện ngay dưới ô bị sai, và ticket chưa vào hàng đợi.
+**Bước 1–2: backend cấp mã T05, GenAI trả sai mã (mẫu 7).** Ô mã ticket ở cả hai bước đều bị khóa. Lỗi "GenAI trả 'T70' nhưng hệ thống đã cấp 'T05'" hiện ngay dưới ô, và ticket chưa vào hàng đợi.
 
 ![Xem và sửa kết quả GenAI](images/01-xem-sua-genai.jpg)
 
-**Bước 3: hàng đợi do code xếp.** T04 (hạn 09:00) đứng đầu, sau đó là T02 → T01 → T06 → T03. Mỗi dòng có lý do xếp hạng.
+**Bước 3: hàng đợi do code xếp.** Mẫu 1–4 được cấp T01–T04 như đề. T04 (hạn 09:00) đứng đầu, sau đó là T02 → T01 → T03, và T05 vừa xác nhận với mã hệ thống. Mỗi dòng có lý do xếp hạng. Thông báo xác nhận không ghi "đã sửa ticket_id", vì người dùng không sửa mã.
 
 ![Hàng đợi ưu tiên](images/02-hang-doi.jpg)
 
-**Lịch sử xử lý:** GenAI trả `"severity": "urgent"`, người dùng sửa thành `"high"`, và cả hai bản đều được lưu.
+**Lịch sử xử lý:** `raw_input` có mã backend cấp (T05), `llm_output` giữ nguyên mã sai GenAI trả (T70), còn `user_output` dùng mã hệ thống (T05).
 
 ![Lịch sử xử lý](images/03-lich-su.jpg)
 
@@ -189,6 +193,7 @@ Các test thuật toán, chia theo 3 nhóm đề yêu cầu:
 
 - **Chỉ chạy 1 worker.** Heap nằm trong bộ nhớ của tiến trình, chạy nhiều worker thì mỗi worker có một hàng đợi riêng. Một `threading.Lock` bảo đảm hai request không sửa heap cùng lúc.
 - **Thời gian trong database lưu theo UTC** (`timestamptz` trên Supabase). API trả về theo `APP_TIMEZONE`.
-- **Mã trùng thì từ chối**, không cập nhật đè. Đề cho phép "từ chối hoặc nêu rõ quy tắc cập nhật".
+- **Mã ticket do backend cấp**, nên người dùng không tạo được mã trùng. Nếu vẫn trùng (dữ liệu ghi sai) thì từ chối, không cập nhật đè. Đề cho phép "từ chối hoặc nêu rõ quy tắc cập nhật".
+- **Mã có thể bị "nhảy số".** Mỗi lần extract cấp một mã, kể cả khi người dùng không xác nhận. Ví dụ T05 không xác nhận thì hàng đợi có T04 rồi T06. Cách này giống số thứ tự tự tăng trong database, và giữ cho mã không bao giờ bị dùng lại.
 - **Chế độ mock chỉ đọc được tin nhắn có trong `samples/`.** Tin nhắn khác sẽ báo lỗi rõ ràng, không bịa ra kết quả.
 - **`method="function_calling"`** được dùng thay cho mặc định `json_schema` của LangChain, vì chế độ strict của OpenAI không nhận một số ràng buộc như `max_length`. Ràng buộc vẫn được Pydantic kiểm tra lại ở bước sau.
