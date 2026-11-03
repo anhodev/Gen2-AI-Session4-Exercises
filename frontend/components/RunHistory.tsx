@@ -13,6 +13,7 @@ const STATUS_TONE: Record<Run["status"], string> = { extracted: "blue", confirme
 const MODULES = [
   { id: "tickets", label: "01 · Ticket" },
   { id: "docks", label: "02 · Giờ nhận xe" },
+  { id: "expenses", label: "03 · Hóa đơn trùng" },
 ];
 
 export default function RunHistory() {
@@ -55,7 +56,7 @@ export default function RunHistory() {
               <tbody>
                 {runs.map((run) => (
                   <tr key={run.id} onClick={() => setSelected(run)} className={clsx(selected?.id === run.id && "selected")}>
-                    <td><strong>#{run.id}</strong><small>{String(run.raw_input.ticket_id ?? run.raw_input.request_id ?? "")}</small></td>
+                    <td><strong>#{run.id}</strong><small>{String(run.raw_input.ticket_id ?? run.raw_input.request_id ?? run.raw_input.submission_id ?? "")}</small></td>
                     <td><span className={`pill ${STATUS_TONE[run.status]}`}>{run.status}</span></td>
                     <td>{run.model}</td>
                     <td>{run.latency_ms} ms</td>

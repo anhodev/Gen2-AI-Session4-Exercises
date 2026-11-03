@@ -1,20 +1,28 @@
 // Gọi FastAPI. Cách viết lấy từ buổi 4: một hàm request() dùng chung, đọc lỗi từ "detail".
 import type {
   BookingOut,
+  CheckOut,
   ConfirmResponse,
   DockExtractResponse,
   DockRequestExtraction,
   DockSample,
+  ExpenseExtraction,
+  ExpenseExtractResponse,
+  ExpenseSample,
   ExtractRequest,
   ExtractResponse,
   Health,
   Issue,
+  PdfTextOut,
   QueueItem,
   QueueResponse,
+  ReviewAction,
+  ReviewOut,
   Run,
   Sample,
   ScheduleOut,
   SlotOut,
+  SubmissionOut,
   TicketExtraction,
 } from "./types";
 
@@ -37,7 +45,7 @@ function issuesFromDetail(detail: unknown): Issue[] {
     if (item && typeof item === "object" && "field" in item) return item as Issue;
     const loc = Array.isArray(item?.loc) ? item.loc : [];
     // Bỏ phần tiền tố không cần cho người dùng: ["body", "ticket", "severity"] -> "severity"
-    const field = loc.filter((p: unknown) => !["body", "ticket", "request", "query"].includes(String(p))).join(".");
+    const field = loc.filter((p: unknown) => !["body", "ticket", "request", "expense", "query"].includes(String(p))).join(".");
     return { field: field || "(toàn bộ)", message: String(item?.msg ?? "Dữ liệu không hợp lệ"), level: "error" };
   });
 }
@@ -48,7 +56,8 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
     response = await fetch(`${API_URL}${path}`, {
       ...options,
       cache: "no-store",
-      headers: { "Content-Type": "application/json", ...options?.headers },
+      // Gửi file (FormData) thì để trình duyệt tự đặt Content-Type kèm boundary
+      headers: options?.body instanceof FormData ? options?.headers : { "Content-Type": "application/json", ...options?.headers },
     });
   } catch {
     throw new ApiError("Không kết nối được tới API.", 0);
@@ -95,6 +104,29 @@ export const api = {
       method: "POST", body: JSON.stringify({ run_id: runId, request: req, dock_id: dockId, start }),
     }),
   dockSchedule: (date: string) => request<ScheduleOut>(`/docks/schedule?date=${date}`),
+
+  // Bài 03
+  expenseSamples: () => request<ExpenseSample[]>("/expenses/samples"),
+  expensePdfText: (file: Blob, filename: string) => {
+    const form = new FormData();
+    form.append("file", file, filename);
+    return request<PdfTextOut>("/expenses/pdf-text", { method: "POST", body: form });
+  },
+  expenseSamplePdf: async () => {
+    const response = await fetch(`${API_URL}/expenses/sample-pdf`, { cache: "no-store" });
+    if (!response.ok) throw new ApiError("Không tải được PDF mẫu", response.status);
+    return response.blob();
+  },
+  expenseExtract: (text: string) =>
+    request<ExpenseExtractResponse>("/expenses/extract", { method: "POST", body: JSON.stringify({ text }) }),
+  expenseCheck: (runId: number, expense: ExpenseExtraction) =>
+    request<CheckOut>("/expenses/check", { method: "POST", body: JSON.stringify({ run_id: runId, expense }) }),
+  expenseReview: (submissionId: string, action: ReviewAction, expense: ExpenseExtraction | null = null, note = "") =>
+    request<ReviewOut>("/expenses/review", {
+      method: "POST",
+      body: JSON.stringify({ submission_id: submissionId, action, expense, note: note.trim() || null }),
+    }),
+  expenseSubmissions: (limit = 20) => request<SubmissionOut[]>(`/expenses/submissions?limit=${limit}`),
 
   runs: (module: string, limit = 30) => request<Run[]>(`/runs?module=${module}&limit=${limit}`),
 };

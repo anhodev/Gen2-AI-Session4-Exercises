@@ -10,6 +10,7 @@ import { api } from "@/lib/api";
 import type { Health } from "@/lib/types";
 import TicketWorkspace from "@/components/TicketWorkspace";
 import DockWorkspace from "@/components/DockWorkspace";
+import ExpenseWorkspace from "@/components/ExpenseWorkspace";
 import RunHistory from "@/components/RunHistory";
 
 type View = "tickets" | "docks" | "expenses" | "plans" | "history";
@@ -17,14 +18,14 @@ type View = "tickets" | "docks" | "expenses" | "plans" | "history";
 const NAV: { id: View; label: string; icon: LucideIcon; ready: boolean }[] = [
   { id: "tickets", label: "01 · Ưu tiên ticket", icon: Inbox, ready: true },
   { id: "docks", label: "02 · Giờ nhận xe", icon: Truck, ready: true },
-  { id: "expenses", label: "03 · Hóa đơn trùng", icon: FileSearch, ready: false },
+  { id: "expenses", label: "03 · Hóa đơn trùng", icon: FileSearch, ready: true },
   { id: "plans", label: "04 · Thứ tự công việc", icon: GitBranch, ready: false },
 ];
 
 const TITLES: Record<View, [string, string]> = {
   tickets: ["Khách hàng nào cần được hỗ trợ trước?", "GenAI đọc tin nhắn và điền mẫu JSON. Code tính hạn xử lý (SLA) và xếp hàng đợi bằng min-heap."],
   docks: ["Xe giao hàng nên vào cửa kho lúc mấy giờ?", "GenAI đọc email đặt lịch. Code gộp khoảng bận của từng cửa và chọn cửa trống sớm nhất. Giờ hiển thị theo múi giờ kho."],
-  expenses: ["Hóa đơn này đã được gửi trước đó chưa?", "Sắp có."],
+  expenses: ["Hóa đơn này đã được gửi trước đó chưa?", "GenAI đọc chứng từ. Code tạo nhãn tra cứu và dùng hash map tìm bản có thể trùng. Người duyệt quyết định, hệ thống không tự kết luận gian lận."],
   plans: ["Việc nào phải làm trước?", "Sắp có."],
   history: ["Lịch sử xử lý", "Nội dung gốc, JSON GenAI trả, bản người dùng sửa, kết quả cuối và thời gian xử lý."],
 };
@@ -86,8 +87,9 @@ export default function Home() {
         )}
         {view === "tickets" && <TicketWorkspace llmMode={health?.llm ?? "mock"} />}
         {view === "docks" && <DockWorkspace llmMode={health?.llm ?? "mock"} />}
+        {view === "expenses" && <ExpenseWorkspace llmMode={health?.llm ?? "mock"} />}
         {view === "history" && <RunHistory />}
-        {!["tickets", "docks", "history"].includes(view) && <div className="panel"><div className="empty"><Boxes size={25} /><span>Bài này sẽ làm ở các phần sau.</span></div></div>}
+        {!["tickets", "docks", "expenses", "history"].includes(view) && <div className="panel"><div className="empty"><Boxes size={25} /><span>Bài này sẽ làm ở các phần sau.</span></div></div>}
       </main>
     </div>
   );

@@ -208,3 +208,44 @@ code { font-family:ui-monospace, SFMono-Regular, Menlo, monospace; font-size:.92
   .metric-value { display:block; }
   .metric-value strong { font-size:18px; display:block; }
 }
+
+/* --- Bài 03: kết quả kiểm tra trùng và bảng so cặp chứng từ --- */
+.file-chip { display:inline-flex; align-items:center; gap:4px; font-size:11px; font-weight:700; color:#5b3fe0; background:#efeaff; padding:4px 8px; border-radius:20px; }
+.result-card { border-radius:11px; padding:12px 14px; display:flex; flex-direction:column; gap:12px; border:1px solid transparent; }
+.result-card.dup { background:var(--amber-bg); color:var(--amber); }
+.result-card.review { background:#e9f1ff; color:#2c5fa8; }
+.result-card.unique { background:#e7f8ef; color:#1f7a4d; }
+.result-card.stale { opacity:.75; border-style:dashed; border-color:currentColor; }
+.result-head { display:flex; gap:10px; align-items:flex-start; }
+.result-head > svg { flex:none; margin-top:2px; }
+.result-head > div { flex:1; min-width:0; }
+.result-head strong, .result-head span, .result-head small { display:block; }
+.result-head strong { font-size:13px; margin-bottom:3px; }
+.result-head span { font-size:12px; line-height:1.5; }
+.result-head small { font-size:11px; margin-top:6px; display:flex; flex-wrap:wrap; gap:4px; align-items:center; }
+.result-head code { background:#ffffffa6; border-radius:5px; padding:1px 5px; font-size:10.5px; color:var(--ink); }
+.compare { background:white; border-radius:9px; padding:10px 12px; color:var(--ink); }
+.compare > p { margin:0 0 8px; font-size:12px; }
+.compare-table { width:100%; border-collapse:collapse; font-size:12px; table-layout:fixed; }
+.compare-table col.label { width:22%; }
+.compare-table col.value { width:30%; }
+.compare-table col.note { width:18%; }
+.compare-table th { text-align:left; font-size:10.5px; text-transform:uppercase; letter-spacing:.04em; color:var(--muted); padding:5px 6px; border-bottom:1px solid var(--line); }
+.compare-table td { padding:6px; border-bottom:1px solid #f1eff4; vertical-align:top; word-break:break-word; }
+.compare-table td.note { font-size:11px; color:var(--muted); line-height:1.35; }
+.compare-table tr.diff td { background:#fff1f2; }
+.compare-table tr.diff td.note { color:var(--red); font-weight:700; }
+.compare-table tr.soft td { background:#fffbea; }
+.compare-table tr.soft td.note { color:var(--amber); }
+/* pre-wrap: vẫn thấy dấu cách thừa (vd "  abc   travel ") nhưng được xuống dòng */
+.mono { font-family:ui-monospace, SFMono-Regular, Menlo, monospace; font-size:11.5px; white-space:pre-wrap; word-break:break-all; }
+.review-box { display:flex; flex-direction:column; gap:8px; }
+.review-box input { width:100%; border:1px solid #ddd9e2; border-radius:9px; padding:9px 11px; background:#fff; color:var(--ink); outline:none; }
+.review-box small { font-size:11px; opacity:.85; }
+.danger-button { height:38px; padding:0 13px; border-radius:9px; border:0; background:var(--red); color:white; font-size:12px; font-weight:700; display:inline-flex; align-items:center; gap:6px; }
+.stale-note { margin:0; font-size:12px; font-weight:700; }
+.data-table td.amount { white-space:nowrap; font-variant-numeric:tabular-nums; }
+.data-table em.null { color:#b3adbb; font-style:normal; font-size:11px; }
+.row-actions { display:flex; gap:4px; margin-top:6px; flex-wrap:wrap; }
+.row-actions button { border:1px solid #ded9ec; background:#faf9fd; color:#6954bb; border-radius:7px; padding:3px 7px; font-size:10.5px; font-weight:700; white-space:nowrap; }
+.row-actions button:hover:not(:disabled) { background:#f1edff; }

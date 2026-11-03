@@ -48,7 +48,8 @@ def create_tables(engine: Engine) -> None:
     # Import để SQLAlchemy biết có những bảng nào
     from app.core import entities  
     from app.modules.tickets import entities as ticket_entities
-    from app.modules.docks import entities as dock_entities  # noqa: F401
+    from app.modules.docks import entities as dock_entities
+    from app.modules.expenses import entities as expense_entities  # noqa: F401
 
     Base.metadata.create_all(bind=engine)
 

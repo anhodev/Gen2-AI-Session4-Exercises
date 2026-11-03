@@ -40,6 +40,14 @@ create table if not exists public.tickets (
 
 create index if not exists ix_tickets_status on public.tickets (status);
 
+-- Bài 01: mã ticket do backend cấp (T01, T02...)
+create table if not exists public.ticket_numbers (
+  id bigserial primary key,                    -- số tự tăng, backend sinh mã T01, T02...
+  ticket_id varchar(50) unique,
+  run_id bigint references public.runs(id) on delete set null,
+  created_at timestamptz not null default now()
+);
+
 -- Bài 02: cửa kho, mã yêu cầu, lịch đặt
 -- btree_gist: cần để ràng buộc EXCLUDE so sánh "=" trên cột dock_id
 create extension if not exists btree_gist;
@@ -78,10 +86,50 @@ create table if not exists public.dock_bookings (
 
 create index if not exists ix_dock_bookings_dock_id on public.dock_bookings (dock_id);
 
+-- Bài 03: chứng từ chi phí và nhật ký duyệt
+create table if not exists public.expense_submissions (
+  id bigserial primary key,                    -- số tự tăng, backend sinh mã E01, E02...
+  submission_id varchar(20) unique,
+  run_id bigint references public.runs(id) on delete set null,
+  vendor varchar(200),
+  invoice_number varchar(64),
+  transaction_date date,
+  amount_minor bigint check (amount_minor >= 0),  -- đơn vị nhỏ nhất (đồng, cent), số nguyên
+  currency varchar(3) check (currency in ('VND', 'USD')),
+  receipt_id varchar(64),
+  status varchar(20) not null default 'new' check (status in ('new', 'checked')),
+  check_status varchar(30)
+    check (check_status in ('duplicate_candidate', 'needs_review', 'unique_under_current_rules')),
+  matched_ids jsonb,                           -- mã các chứng từ cũ trùng nhãn
+  review_status varchar(30)
+    check (review_status in ('pending', 'confirmed_duplicate', 'dismissed')),
+  created_at timestamptz not null default now(),
+  checked_at timestamptz,
+  reviewed_at timestamptz
+);
+
+create index if not exists ix_expense_submissions_status on public.expense_submissions (status);
+
+create table if not exists public.expense_reviews (
+  id bigserial primary key,
+  submission_id varchar(20) not null,
+  action varchar(30) not null check (action in ('confirm_duplicate', 'dismiss', 'recheck')),
+  before jsonb,                                -- thông tin chứng từ trước khi sửa
+  after jsonb,                                 -- sau khi sửa
+  result jsonb,                                -- kết quả kiểm tra lại
+  note text,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists ix_expense_reviews_submission_id on public.expense_reviews (submission_id);
+
 -- Bật Row Level Security: chặn truy cập trực tiếp qua Supabase API bằng anon key.
 -- Backend kết nối bằng user postgres nên không bị ảnh hưởng.
 alter table public.runs enable row level security;
 alter table public.tickets enable row level security;
+alter table public.ticket_numbers enable row level security;
 alter table public.docks enable row level security;
 alter table public.dock_requests enable row level security;
 alter table public.dock_bookings enable row level security;
+alter table public.expense_submissions enable row level security;
+alter table public.expense_reviews enable row level security;

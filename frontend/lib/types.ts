@@ -166,3 +166,86 @@ export interface ScheduleOut {
   cleanup_minutes: number; // số phút dọn cửa sau mỗi xe
   docks: { dock_id: string; dock_type: DockType; bookings: ScheduleBooking[] }[];
 }
+
+// --- Bài 03: khớp với backend/app/modules/expenses/schemas.py ---
+
+export type ExpenseMissingField = "vendor" | "invoice_number" | "transaction_date" | "amount_minor" | "currency" | "receipt_id";
+export type CheckStatus = "duplicate_candidate" | "needs_review" | "unique_under_current_rules";
+export type ReviewStatus = "pending" | "confirmed_duplicate" | "dismissed";
+export type ReviewAction = "confirm_duplicate" | "dismiss" | "recheck";
+
+export interface ExpenseExtraction {
+  submission_id: string;
+  vendor: string | null;
+  invoice_number: string | null;
+  transaction_date: string | null; // YYYY-MM-DD
+  amount_minor: number | null;     // đơn vị nhỏ nhất: VND là đồng, USD là cent
+  currency: string | null;
+  receipt_id: string | null;
+  missing_fields: ExpenseMissingField[];
+}
+
+export interface ExpenseSample {
+  label: string;
+  note: string;
+  text: string;
+}
+
+export interface ExpenseExtractResponse {
+  run_id: number | null;
+  submission_id: string; // mã backend vừa cấp
+  llm_output: Record<string, unknown> | null;
+  extraction: ExpenseExtraction | null;
+  issues: Issue[];
+  can_check: boolean;
+}
+
+export interface PdfTextOut {
+  filename: string | null;
+  text: string;
+}
+
+export interface SubmissionOut {
+  submission_id: string;
+  vendor: string | null;
+  invoice_number: string | null;
+  transaction_date: string | null;
+  amount_minor: number | null;
+  currency: string | null;
+  receipt_id: string | null;
+  amount_text: string | null; // vd "1.250.000 VND"
+  check_status: CheckStatus | null;
+  matched_ids: string[];
+  review_status: ReviewStatus | null;
+  checked_at: string | null;
+  reviewed_at: string | null;
+}
+
+export interface FieldDiffOut {
+  field: string;
+  current: string | null;
+  previous: string | null;
+  note: string;
+}
+
+export interface MatchOut {
+  submission_id: string;
+  matched_by: ("receipt" | "invoice")[];
+  differences: FieldDiffOut[];
+  previous: SubmissionOut;
+}
+
+export interface CheckOut {
+  submission_id: string;
+  status: CheckStatus;
+  reason: string;
+  keys: string[][];
+  matches: MatchOut[];
+  review_status: ReviewStatus | null;
+  warnings: Issue[];
+}
+
+export interface ReviewOut {
+  submission: SubmissionOut;
+  result: CheckOut | null;
+}
