@@ -8,7 +8,7 @@ Bài tập Gen2-AI: 4 tình huống doanh nghiệp ghép thành **một ứng d�
 | Bài | Tình huống | Thuật toán | Trạng thái |
 |---|---|---|---|
 | [01](docs/bai-01-tickets/README.md) | Khách hàng nào cần được hỗ trợ trước? | Hàng đợi ưu tiên (min-heap) | ✅ Xong |
-| 02 | Xe giao hàng nên vào cửa kho lúc mấy giờ? | Gộp khoảng thời gian | Chưa làm |
+| [02](docs/bai-02-docks/README.md) | Xe giao hàng nên vào cửa kho lúc mấy giờ? | Gộp khoảng thời gian (interval) | ✅ Xong |
 | 03 | Hóa đơn này đã được gửi trước đó chưa? | Tra cứu bằng hash map | Chưa làm |
 | 04 | Việc nào phải làm trước? | Đồ thị phụ thuộc (topological sort) | Chưa làm |
 
@@ -26,17 +26,19 @@ Bài tập Gen2-AI: 4 tình huống doanh nghiệp ghép thành **một ứng d�
 ```
 ├── backend/
 │   ├── app/
-│   │   ├── main.py              # create_app + lifespan (dựng lại hàng đợi khi khởi động)
+│   │   ├── main.py              # create_app + lifespan (dựng lại hàng đợi, seed cửa kho khi khởi động)
 │   │   ├── core/                # dùng chung 4 bài: config, database, gọi GenAI, lịch sử xử lý
-│   │   └── modules/tickets/     # Bài 01: schemas, validation, extractor, algo, store, router
-│   ├── samples/tickets.json     # dữ liệu mẫu cho chế độ mock (không tốn tiền gọi model)
+│   │   └── modules/
+│   │       ├── tickets/         # Bài 01: schemas, validation, extractor, algo, store, router
+│   │       └── docks/           # Bài 02: cùng cấu trúc, thêm entities (bảng cửa kho, lịch đặt)
+│   ├── samples/                 # tickets.json, docks.json: dữ liệu mẫu cho chế độ mock (không tốn tiền gọi model)
 │   ├── supabase/schema.sql      # tạo bảng trên Supabase
 │   └── tests/
 ├── frontend/
 │   ├── app/                     # trang chính + proxy /api -> FastAPI
-│   ├── components/              # TicketWorkspace, RunHistory, ui
+│   ├── components/              # TicketWorkspace, DockWorkspace, RunHistory, ui
 │   └── lib/                     # api.ts, types.ts
-└── docs/bai-01-tickets/         # tài liệu, JSON Schema, ảnh chụp Bài 01
+└── docs/                        # tài liệu, JSON Schema, ảnh chụp từng bài
 ```
 
 ## Cài đặt và chạy
@@ -59,14 +61,15 @@ Các giá trị trong `backend/.env`:
 | `OPENAI_API_KEY`, `OPENAI_MODEL` | Key và model OpenAI. Để trống key thì app tự dùng chế độ mock |
 | `MOCK_LLM` | `true`: đọc kết quả từ `samples/`, không gọi model. `false`: gọi model thật |
 | `DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASSWORD`, `DB_DATABASE`, `DB_SSLMODE` | Kết nối Supabase. Để trống `DB_HOST` thì dùng SQLite tại `backend/data/app.db` |
-| `APP_TIMEZONE` | Múi giờ hiển thị kết quả, mặc định `Asia/Ho_Chi_Minh` |
+| `APP_TIMEZONE` | Múi giờ hiển thị kết quả và múi giờ của kho, mặc định `Asia/Ho_Chi_Minh` (GMT+7) |
+| `DOCK_OPEN`, `DOCK_CLOSE` | Giờ mở và đóng cửa kho (Bài 02), mặc định `08:00`, `18:00` |
 | `FRONTEND_ORIGIN` | Địa chỉ frontend được phép gọi API (CORS) |
 
 **Supabase** (tùy chọn):
 1. Mở SQL Editor và chạy file `backend/supabase/schema.sql`.
 2. Lấy thông tin kết nối ở *Project Settings → Database → Connection parameters*.
 
-Chạy server (chỉ 1 worker, vì hàng đợi nằm trong bộ nhớ):
+Chạy server (chỉ 1 worker, vì hàng đợi Bài 01 nằm trong bộ nhớ):
 
 ```bash
 myenv/bin/uvicorn app.main:app --reload --reload-dir app --port 8000
@@ -91,7 +94,7 @@ cd backend
 myenv/bin/python -m pytest -q
 ```
 
-Hiện có 94 test, chạy trong khoảng 1 giây. Test không gọi GenAI và không cần Supabase (dùng mock và SQLite tạm).
+Hiện có 252 test, chạy trong khoảng 1 giây. Test không gọi GenAI và không cần Supabase (dùng mock và SQLite tạm).
 
 ## Dữ liệu
 

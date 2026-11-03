@@ -1,0 +1,81 @@
+{
+  "additionalProperties": false,
+  "description": "Thông tin GenAI đọc ra từ email đặt lịch giao hàng.",
+  "properties": {
+    "request_id": {
+      "description": "Chép đúng mã yêu cầu hệ thống đã cấp. Không tự tạo mã mới.",
+      "title": "Request Id",
+      "type": "string"
+    },
+    "carrier": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "Tên nhà vận chuyển. null nếu email không ghi.",
+      "title": "Carrier"
+    },
+    "earliest_start": {
+      "anyOf": [
+        {
+          "format": "date-time",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "Giờ sớm nhất xe có thể đến, dạng ISO 8601, ví dụ 2026-10-21T09:00:00. Giờ trong email là giờ địa phương của kho. null nếu email không ghi giờ đến.",
+      "title": "Earliest Start"
+    },
+    "duration_minutes": {
+      "anyOf": [
+        {
+          "exclusiveMinimum": 0,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "Số phút cần dùng cửa kho để dỡ hàng, phải > 0. null nếu email không nói. KHÔNG tự đoán từ loại hàng hay số lượng hàng.",
+      "title": "Duration Minutes"
+    },
+    "dock_type": {
+      "description": "refrigerated nếu hàng cần giữ lạnh/đông lạnh, ngược lại standard.",
+      "enum": [
+        "standard",
+        "refrigerated"
+      ],
+      "title": "Dock Type",
+      "type": "string"
+    },
+    "missing_fields": {
+      "description": "Tên các ô để null vì email không có thông tin. Ví dụ ['duration_minutes'].",
+      "items": {
+        "enum": [
+          "carrier",
+          "earliest_start",
+          "duration_minutes"
+        ],
+        "type": "string"
+      },
+      "title": "Missing Fields",
+      "type": "array"
+    }
+  },
+  "required": [
+    "request_id",
+    "carrier",
+    "earliest_start",
+    "duration_minutes",
+    "dock_type",
+    "missing_fields"
+  ],
+  "title": "DockRequestExtraction",
+  "type": "object"
+}
