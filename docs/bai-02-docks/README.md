@@ -41,10 +41,10 @@ Mẫu định nghĩa bằng Pydantic tại [`schemas.py`](../../backend/app/modu
 |---|---|---|
 | `request_id` | string | Chép đúng mã hệ thống đã cấp trong prompt. Email có ghi mã khác cũng không được dùng |
 | `carrier` | string \| null | `null` nếu email không ghi |
-| `earliest_start` | datetime \| null | Giờ sớm nhất xe có thể đến. Ngày tương đối ("sáng mai") tính theo giờ nhận email |
+| `earliest_start` | datetime \| null | Giờ sớm nhất xe có thể đến. Giữ nguyên giờ ghi trong email, không tự đổi sang UTC. Ngày tương đối ("sáng mai") tính theo giờ nhận email |
 | `duration_minutes` | int \| null, > 0 | `null` nếu email không nói. **Không** đoán từ loại hàng hay số pallet |
 | `dock_type` | enum | `standard` hoặc `refrigerated` (hàng lạnh, đông lạnh) |
-| `missing_fields` | list | Tên các ô để `null`, chỉ gồm `carrier`, `earliest_start`, `duration_minutes` |
+| `missing_fields` | list | Đúng những ô đang để `null`, chỉ gồm `carrier`, `earliest_start`, `duration_minutes`. Ô đã có giá trị thì không ghi; đủ thông tin thì `[]` |
 
 ### Múi giờ
 

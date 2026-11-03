@@ -26,7 +26,7 @@ Bài tập Gen2-AI: 4 tình huống doanh nghiệp ghép thành **một ứng d�
 ```
 ├── backend/
 │   ├── app/
-│   │   ├── main.py              # create_app + lifespan (dựng lại hàng đợi, seed cửa kho, dựng lại bảng tra cứu chứng từ)
+│   │   ├── main.py              # create_app + lifespan (dựng lại hàng đợi, tạo nhân viên mẫu, seed cửa kho, dựng lại bảng tra cứu chứng từ)
 │   │   ├── core/                # dùng chung 4 bài: config, database, gọi GenAI, lịch sử xử lý
 │   │   └── modules/
 │   │       ├── tickets/         # Bài 01: schemas, validation, extractor, algo, store, router

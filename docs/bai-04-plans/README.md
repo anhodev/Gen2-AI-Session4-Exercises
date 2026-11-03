@@ -56,7 +56,7 @@ Mẫu định nghĩa bằng Pydantic tại [`schemas.py`](../../backend/app/modu
 
 - Mẫu không cho phép ô lạ (`additionalProperties: false`). GenAI gửi thêm `"order": [...]` để tự xếp thứ tự sẽ bị lớp 1 từ chối.
 - Tối đa 100 việc và 500 quan hệ. Biên bản tối đa 20.000 ký tự.
-- Prompt ([`extractor.py`](../../backend/app/modules/plans/extractor.py)) đặt biên bản trong thẻ `<minutes>` và nói rõ đó là dữ liệu, không phải chỉ dẫn. Prompt giải thích hướng mũi tên bằng 2 câu ví dụ của đề, và cấm GenAI tự thêm quan hệ theo kinh nghiệm.
+- Prompt ([`extractor.py`](../../backend/app/modules/plans/extractor.py)) đặt biên bản trong thẻ `<minutes>` và nói rõ đó là dữ liệu, không phải chỉ dẫn. Prompt giải thích hướng mũi tên bằng 2 câu ví dụ của đề, và cấm GenAI tự thêm quan hệ theo kinh nghiệm. Prompt cũng nói rõ: một câu có thể cho nhiều quan hệ ("C khi A và B đều xong"), phải đọc hết cả câu thứ hai trong cùng một dòng, tự soát chiều mũi tên, và chủ ngữ của câu giao việc là người phụ trách. Các quy tắc này được thêm sau khi chạy thử với model thật (mục 8).
 
 ### Mã việc do backend cấp
 
@@ -276,7 +276,7 @@ Các mẫu `[Lỗi]` giả lập lỗi của GenAI để test code. Model thật
 
 ![Xem và sửa](images/01-xem-sua.jpg)
 
-**Thứ tự kèm lý do:** T01 và T02 cùng bắt đầu được, chọn T01 vì mã đứng trước. T03 chờ T01, T02. Lần tính được lưu ở bảng bên dưới, giờ hiển thị theo GMT+7.
+**Thứ tự kèm lý do:** T01 và T02 cùng bắt đầu được, chọn T01 vì mã đứng trước. T03 chờ T01, T02. Phía trên bảng là 4 đợt: T01 và T02 làm cùng lúc ở đợt 1. Lần tính được lưu ở bảng bên dưới, giờ hiển thị theo GMT+7.
 
 ![Thứ tự](images/02-thu-tu.jpg)
 
@@ -284,7 +284,7 @@ Các mẫu `[Lỗi]` giả lập lỗi của GenAI để test code. Model thật
 
 ![Vòng chờ nhau](images/03-vong-cho-nhau.jpg)
 
-**Xóa T04 → T01 rồi tính lại:** lần tính 2 xếp được T01 → T02 → T03 → T04. Lịch sử giữ cả lần 1 (có vòng) và lần 2.
+**Xóa T04 → T01 rồi tính lại:** lần tính 2 xếp được T01 → T02 → T03 → T04, chia 3 đợt. Lịch sử giữ cả lần 1 (có vòng) và lần 2.
 
 ![Xóa vòng và tính lại](images/04-xoa-vong-tinh-lai.jpg)
 
