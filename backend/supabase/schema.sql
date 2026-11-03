@@ -48,6 +48,15 @@ create table if not exists public.ticket_numbers (
   created_at timestamptz not null default now()
 );
 
+-- Bài 01 (làm thêm): nhân viên nhận ticket. Kỹ năng là các loại yêu cầu xử lý được.
+create table if not exists public.ticket_staff (
+  staff_id varchar(20) primary key,            -- NV01, NV02... do backend cấp
+  name varchar(100) not null,
+  skills jsonb not null,                       -- vd ["billing", "account"]
+  max_tickets integer not null constraint ck_ticket_staff_max check (max_tickets >= 0),  -- 0 = tạm không nhận
+  updated_at timestamptz not null default now()
+);
+
 -- Bài 02: cửa kho, mã yêu cầu, lịch đặt
 -- btree_gist: cần để ràng buộc EXCLUDE so sánh "=" trên cột dock_id
 create extension if not exists btree_gist;
@@ -146,6 +155,7 @@ create index if not exists ix_plan_orders_status on public.plan_orders (status);
 alter table public.runs enable row level security;
 alter table public.tickets enable row level security;
 alter table public.ticket_numbers enable row level security;
+alter table public.ticket_staff enable row level security;
 alter table public.docks enable row level security;
 alter table public.dock_requests enable row level security;
 alter table public.dock_bookings enable row level security;

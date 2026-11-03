@@ -2,6 +2,7 @@
   1. TicketExtraction: mẫu JSON GenAI phải điền. Truyền vào
      with_structured_output.
   2. Request / Response của API
+  3. Làm thêm: nhân viên và giao ticket
 """
 
 from __future__ import annotations
@@ -116,3 +117,58 @@ class QueueItem(BaseModel):
 class QueueResponse(BaseModel):
     total: int               # tổng số ticket đang chờ
     items: list[QueueItem]   # top K, xem không làm thay đổi hàng đợi
+
+
+# 3. Làm thêm: nhân viên và giao ticket
+STAFF_MAX = 50       # số nhân viên tối đa
+MAX_TICKETS_CAP = 50  # số việc tối đa của một người
+
+
+class StaffIn(BaseModel):
+    """Một nhân viên trong danh sách người dùng gửi lên. Người mới thêm có staff_id=null, backend cấp mã."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    staff_id: str | None = Field(None, max_length=20)
+    name: str = Field(..., min_length=1, max_length=100)
+    skills: list[Intent] = Field(..., max_length=len(Intent.__args__), description="Các loại yêu cầu xử lý được")
+    max_tickets: int = Field(..., ge=0, le=MAX_TICKETS_CAP, description="Số ticket tối đa nhận cùng lúc; 0 = tạm không nhận")
+
+
+class StaffUpdate(BaseModel):
+    """PUT /tickets/staff: thay cả danh sách nhân viên."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    staff: list[StaffIn] = Field(..., max_length=STAFF_MAX)
+
+
+class StaffOut(BaseModel):
+    staff_id: str
+    name: str
+    skills: list[Intent]
+    max_tickets: int
+
+
+class StaffLoad(StaffOut):
+    ticket_ids: list[str]  # ticket được giao, theo thứ tự hàng đợi
+
+
+class AssignmentItem(BaseModel):
+    position: int               # vị trí trong hàng đợi
+    ticket_id: str
+    intent: Intent
+    severity: Severity
+    summary: str
+    deadline_at: datetime
+    staff_id: str | None        # None: chưa có nhân viên phù hợp để nhận
+    staff_name: str | None
+    reason: str
+
+
+class AssignmentResponse(BaseModel):
+    total: int                  # số ticket đang chờ
+    assigned: int
+    unassigned: int
+    staff: list[StaffLoad]
+    items: list[AssignmentItem]  # theo thứ tự hàng đợi

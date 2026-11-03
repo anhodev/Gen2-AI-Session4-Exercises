@@ -7,7 +7,7 @@ import pytest
 from pydantic import ValidationError
 
 from app.modules.tickets.schemas import ConfirmRequest, ExtractRequest, TicketExtraction
-from app.modules.tickets.validation import has_errors, validate_extraction
+from app.modules.tickets.validation import has_errors, validate_extraction, validate_staff
 
 
 def good_output(**overrides) -> dict:
@@ -125,3 +125,34 @@ def test_received_at_without_timezone_is_rejected():
 def test_confirm_request_rejects_bad_severity_from_user_edit():
     with pytest.raises(ValidationError):
         ConfirmRequest(run_id=1, ticket=good_output(severity="urgent"))
+
+
+# --- Làm thêm: danh sách nhân viên -------------------------------------------
+
+
+def test_staff_new_people_get_ids_after_largest():
+    staff, issues = validate_staff({"staff": [
+        {"staff_id": "NV07", "name": "An", "skills": ["billing"], "max_tickets": 1},
+        {"staff_id": None, "name": "Bình", "skills": ["technical"], "max_tickets": 1},
+        {"name": "Chi", "skills": ["account"], "max_tickets": 0},
+    ]})
+    assert [s.staff_id for s in staff] == ["NV07", "NV08", "NV09"]
+    assert issues == []
+
+
+def test_staff_name_is_trimmed_and_blank_name_is_error():
+    staff, issues = validate_staff({"staff": [{"name": "  An  ", "skills": ["billing"], "max_tickets": 1},
+                                              {"name": "   ", "skills": ["billing"], "max_tickets": 1}]})
+    assert staff[0].name == "An"
+    assert [(i.field, i.level) for i in issues] == [("staff.1.name", "error")]
+
+
+def test_staff_repeated_skill_is_error_and_no_skill_is_warning():
+    _, issues = validate_staff({"staff": [{"name": "An", "skills": ["billing", "billing"], "max_tickets": 1},
+                                          {"name": "Bình", "skills": [], "max_tickets": 1}]})
+    assert [(i.field, i.level) for i in issues] == [("staff.0.skills", "error"), ("staff.1.skills", "warning")]
+
+
+def test_staff_wrong_shape_is_layer1_error():
+    staff, issues = validate_staff({"staff": [{"name": "An", "skills": ["refund"], "max_tickets": 1}]})
+    assert staff is None and issues[0].field.startswith("staff.0.skills")

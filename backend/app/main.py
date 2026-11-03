@@ -22,7 +22,7 @@ from app.modules.expenses.router import router as expenses_router
 from app.modules.expenses.store import load_index
 from app.modules.plans.router import router as plans_router
 from app.modules.tickets.router import router as tickets_router
-from app.modules.tickets.store import load_queue
+from app.modules.tickets.store import load_queue, seed_staff
 
 
 @asynccontextmanager
@@ -34,6 +34,8 @@ async def lifespan(app: FastAPI):
     with app.state.session_factory() as db:
         # Bài 01: dựng lại hàng đợi ticket từ database
         app.state.ticket_queue = load_queue(db, tz)
+        # Bài 01 (làm thêm): tạo 3 nhân viên mẫu nếu chưa có
+        seed_staff(db)
         # Bài 02: tạo cửa A, B, C và lịch có sẵn nếu database còn trống
         seed_docks(db, tz)
         # Bài 03: dựng lại bảng tra cứu chứng từ từ database

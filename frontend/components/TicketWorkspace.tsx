@@ -1,7 +1,8 @@
 "use client";
 
 // Bài 01 - Màn hình hàng đợi ticket.
-// Luồng: (1) nhập tin nhắn -> GenAI đọc  (2) xem/sửa JSON -> xác nhận  (3) hàng đợi do code xếp.
+// Luồng: (1) nhập tin nhắn -> GenAI đọc  (2) xem/sửa JSON -> xác nhận  (3) hàng đợi do code xếp
+//        (4) làm thêm: giao ticket cho nhân viên theo kỹ năng và số việc tối đa.
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   CheckCircle2, Clock3, Hourglass, Inbox, ListOrdered, Loader2, PlayCircle, RefreshCw, Send, Sparkles, UserRoundCheck,
@@ -10,6 +11,7 @@ import clsx from "clsx";
 import { api, ApiError } from "@/lib/api";
 import { dayTime, gmtLabel, isOverdue, nowVietnamIso, shortTime } from "@/lib/format";
 import type { ConfirmResponse, ExtractResponse, Intent, Issue, QueueItem, QueueResponse, Sample, Severity } from "@/lib/types";
+import TicketAssignments from "./TicketAssignments";
 import { Empty, FieldIssues, JsonBox, Metric, PanelHeader, SeverityPill } from "./ui";
 
 const INTENTS: Intent[] = ["billing", "technical", "account", "other"];
@@ -315,6 +317,9 @@ export default function TicketWorkspace({ llmMode }: { llmMode: string }) {
           </div>
         )}
       </section>
+
+      {/* Bước 4 (làm thêm): queue đổi thì giao lại */}
+      <TicketAssignments refreshKey={queue} />
     </div>
   );
 }

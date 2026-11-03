@@ -5,6 +5,11 @@
   GET  /tickets/queue     Xem top K, không làm thay đổi hàng đợi.
   POST /tickets/next      Lấy ticket kế tiếp ra xử lý.
 
+Làm thêm (giao ticket cho nhân viên):
+  GET  /tickets/staff        Danh sách nhân viên: kỹ năng và số việc tối đa.
+  PUT  /tickets/staff        Thay cả danh sách. Người mới (staff_id=null) được backend cấp mã NV…
+  GET  /tickets/assignments  Ai nhận ticket nào, ticket nào chưa có người phù hợp. Chỉ xem, không lấy ticket ra.
+
 Endpoint viết bằng `def` (không `async def`): gọi GenAI và database là thao tác
 chặn (blocking), FastAPI sẽ chạy `def` trong thread riêng nên server không bị đứng.
 """
@@ -24,19 +29,24 @@ from app.core.entities import Run
 from app.core.llm import load_samples
 from app.core.runs import create_run
 
-from .algo import SLA, DuplicateTicketError, QueuedTicket, TicketError
+from .algo import SLA, DuplicateTicketError, QueuedTicket, StaffError, TicketError, assign_tickets
 from .entities import Ticket
 from .extractor import TASK, extract_ticket
 from .schemas import (
+    AssignmentItem,
+    AssignmentResponse,
     ConfirmRequest,
     ConfirmResponse,
     ExtractRequest,
     ExtractResponse,
     QueueItem,
     QueueResponse,
+    StaffLoad,
+    StaffOut,
+    StaffUpdate,
 )
-from .store import attach_run, mark_done, new_ticket_id, save_ticket
-from .validation import has_errors, validate_extraction
+from .store import attach_run, list_staff, mark_done, new_ticket_id, replace_staff, save_ticket, to_algo_staff
+from .validation import has_errors, validate_extraction, validate_staff
 
 router = APIRouter(prefix="/tickets", tags=["Bài 01 - Tickets"])
 
@@ -206,6 +216,82 @@ def next_ticket(
         record = mark_done(db, ticket.ticket_id)
 
     return to_queue_item(top[0], record, tz)
+
+
+# --- Làm thêm: giao ticket cho nhân viên ------------------------------------
+
+@router.get("/staff", response_model=list[StaffOut])
+def get_staff(db: Session = Depends(get_db)):
+    """Danh sách nhân viên, theo mã."""
+    return list_staff(db)
+
+
+@router.put("/staff", response_model=list[StaffOut])
+def put_staff(payload: StaffUpdate, db: Session = Depends(get_db)):
+    """
+    Thay cả danh sách nhân viên. Người mới (staff_id=null) được cấp mã NV kế tiếp.
+
+    Raises:
+        HTTPException: 422 sai khuôn (kỹ năng ngoài danh sách, số việc âm…);
+            400 kèm danh sách lỗi (tên rỗng, mã trùng, mã không do hệ thống cấp, kỹ năng ghi lặp).
+
+    Returns:
+        list[StaffOut]: Danh sách sau khi lưu.
+    """
+    staff, issues = validate_staff(payload.model_dump())
+    if staff is None or has_errors(issues):
+        raise HTTPException(status_code=400, detail=[i.model_dump() for i in issues])
+    return replace_staff(db, staff)
+
+
+@router.get("/assignments", response_model=AssignmentResponse)
+def assignments(
+    request: Request,
+    db: Session = Depends(get_db),
+    tz: ZoneInfo = Depends(get_display_tz),
+):
+    """
+    Giao các ticket đang chờ cho nhân viên theo thứ tự hàng đợi. Chỉ xem: không lấy ticket nào ra khỏi hàng đợi.
+
+    Returns:
+        AssignmentResponse: Ai nhận ticket nào (kèm lý do), ticket nào chưa có nhân viên phù hợp và vì sao.
+    """
+    queue = request.app.state.ticket_queue
+    with request.app.state.ticket_lock:
+        ordered = queue.peek_top(len(queue)) if len(queue) else []
+
+    # Heap chỉ giữ thông tin để xếp hạng; intent, summary đọc thêm từ database
+    ids = [t.ticket_id for t in ordered]
+    records = {t.ticket_id: t for t in db.scalars(select(Ticket).where(Ticket.ticket_id.in_(ids)))} if ids else {}
+    staff = list_staff(db)
+    try:
+        result = assign_tickets([(t.ticket_id, records[t.ticket_id].intent) for t in ordered], to_algo_staff(staff))
+    except StaffError as exc:  # danh sách đã kiểm tra khi lưu; giữ lại để dữ liệu sai không ra kết quả sai
+        raise HTTPException(status_code=400, detail=str(exc))
+
+    names = {s.staff_id: s.name for s in staff}
+    items = [
+        AssignmentItem(
+            position=n,
+            ticket_id=t.ticket_id,
+            intent=a.intent,
+            severity=t.severity,
+            summary=records[t.ticket_id].summary,
+            deadline_at=t.deadline_at.astimezone(tz),
+            staff_id=a.staff_id,
+            staff_name=names.get(a.staff_id),
+            reason=a.reason,
+        )
+        for n, (t, a) in enumerate(zip(ordered, result.assignments), start=1)
+    ]
+    unassigned = len(result.unassigned)
+    return AssignmentResponse(
+        total=len(items),
+        assigned=len(items) - unassigned,
+        unassigned=unassigned,
+        staff=[StaffLoad(**s.model_dump(), ticket_ids=result.loads[s.staff_id]) for s in staff],
+        items=items,
+    )
 
 
 def to_queue_item(row: dict, record: Ticket, tz: ZoneInfo) -> QueueItem:

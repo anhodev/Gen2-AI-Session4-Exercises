@@ -244,3 +244,101 @@ def test_mock_unknown_message_cannot_confirm(client):
     data = response.json()
     assert data["can_confirm"] is False
     assert data["llm_output"] is None
+
+
+# --- Làm thêm: giao ticket cho nhân viên ------------------------------------
+
+def put_staff(client, staff):
+    return client.put("/tickets/staff", json={"staff": staff})
+
+
+def test_staff_is_seeded(client):
+    staff = client.get("/tickets/staff").json()
+    assert [(s["staff_id"], s["name"], s["skills"], s["max_tickets"]) for s in staff] == [
+        ("NV01", "An", ["billing", "account"], 2),
+        ("NV02", "Bình", ["technical"], 2),
+        ("NV03", "Chi", ["technical", "account"], 1),
+    ]
+
+
+def test_assignments_follow_queue_and_show_who_cannot_be_served(client):
+    for n in range(1, 6):
+        assert confirm(client, n).status_code == 200
+    data = client.get("/tickets/assignments").json()
+    # Hàng đợi: T04 (hạn 09:00), T02 (09:50), T01 (11:00), T03 (16:30), T05 (hôm sau)
+    assert [(i["ticket_id"], i["staff_id"]) for i in data["items"]] == [
+        ("T04", "NV01"), ("T02", "NV02"), ("T01", "NV01"), ("T03", "NV03"), ("T05", None),
+    ]
+    assert (data["total"], data["assigned"], data["unassigned"]) == (5, 4, 1)
+    assert data["items"][4]["reason"] == "Chưa có nhân viên nào có kỹ năng other"
+    assert data["items"][0]["staff_name"] == "An" and data["items"][0]["deadline_at"].endswith("+07:00")
+    assert {s["staff_id"]: s["ticket_ids"] for s in data["staff"]} == {"NV01": ["T04", "T01"], "NV02": ["T02"], "NV03": ["T03"]}
+
+
+def test_viewing_assignments_does_not_remove_tickets(client):
+    for n in (1, 2):
+        confirm(client, n)
+    client.get("/tickets/assignments")
+    client.get("/tickets/assignments")
+    assert queue_ids(client) == ["T02", "T01"]
+    assert client.post("/tickets/next").json()["ticket_id"] == "T02"
+    assert [i["ticket_id"] for i in client.get("/tickets/assignments").json()["items"]] == ["T01"]
+
+
+def test_full_staff_leaves_less_urgent_ticket_unassigned(client):
+    for n in (2, 3):  # T01 technical critical, T02 technical medium
+        confirm(client, n)
+    put_staff(client, [{"staff_id": "NV02", "name": "Bình", "skills": ["technical"], "max_tickets": 1}])
+    items = client.get("/tickets/assignments").json()["items"]
+    assert [(i["ticket_id"], i["staff_id"]) for i in items] == [("T01", "NV02"), ("T02", None)]
+    assert items[1]["reason"].startswith("Những người có kỹ năng technical đều đã nhận đủ ticket gấp hơn (Bình 1/1)")
+
+
+def test_empty_queue_assignments(client):
+    data = client.get("/tickets/assignments").json()
+    assert (data["total"], data["items"]) == (0, [])
+    assert all(s["ticket_ids"] == [] for s in data["staff"])
+
+
+def test_put_staff_gives_new_people_next_id(client):
+    staff = client.get("/tickets/staff").json()
+    staff.append({"staff_id": None, "name": "Dũng", "skills": ["other"], "max_tickets": 3})
+    saved = put_staff(client, staff).json()
+    assert saved[-1] == {"staff_id": "NV04", "name": "Dũng", "skills": ["other"], "max_tickets": 3}
+    assert client.get("/tickets/staff").json() == saved
+
+
+def test_new_staff_member_takes_the_unassigned_ticket(client):
+    confirm(client, 5)  # T01: intent other
+    assert client.get("/tickets/assignments").json()["unassigned"] == 1
+    staff = client.get("/tickets/staff").json() + [{"name": "Dũng", "skills": ["other"], "max_tickets": 1}]
+    put_staff(client, staff)
+    assert client.get("/tickets/assignments").json()["items"][0]["staff_name"] == "Dũng"
+
+
+def test_put_staff_rejects_duplicate_and_foreign_ids(client):
+    response = put_staff(client, [
+        {"staff_id": "NV01", "name": "An", "skills": ["billing"], "max_tickets": 1},
+        {"staff_id": "NV01", "name": "Bình", "skills": ["technical"], "max_tickets": 1},
+        {"staff_id": "X9", "name": "Chi", "skills": ["account"], "max_tickets": 1},
+    ])
+    assert response.status_code == 400
+    assert [i["field"] for i in response.json()["detail"]] == ["staff.1.staff_id", "staff.2.staff_id"]
+    assert len(client.get("/tickets/staff").json()) == 3  # lỗi thì không lưu gì
+
+
+@pytest.mark.parametrize("bad", [
+    {"name": "An", "skills": ["refund"], "max_tickets": 1},
+    {"name": "An", "skills": ["billing"], "max_tickets": -1},
+    {"name": "", "skills": ["billing"], "max_tickets": 1},
+    {"name": "An", "skills": ["billing"], "max_tickets": 1, "role": "lead"},
+])
+def test_put_staff_rejects_wrong_shape(client, bad):
+    assert put_staff(client, [bad]).status_code == 422
+
+
+def test_staff_survives_restart(db_url):
+    with make_client(db_url) as c:
+        put_staff(c, [{"name": "Lan", "skills": ["billing"], "max_tickets": 5}])
+    with make_client(db_url) as c:
+        assert [s["name"] for s in c.get("/tickets/staff").json()] == ["Lan"]  # không seed lại khi đã có người

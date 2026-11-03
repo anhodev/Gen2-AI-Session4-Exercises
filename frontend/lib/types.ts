@@ -331,3 +331,37 @@ export interface OrderSummary {
   dependency_count: number;
   created_at: string;
 }
+
+// --- Bài 01 (làm thêm): nhân viên và giao ticket ---
+
+export interface StaffMember {
+  staff_id: string | null; // null: người mới thêm, backend cấp mã NV… khi lưu
+  name: string;
+  skills: Intent[];        // các loại yêu cầu xử lý được
+  max_tickets: number;     // 0 = tạm không nhận
+}
+
+export interface StaffLoad extends StaffMember {
+  staff_id: string;
+  ticket_ids: string[];
+}
+
+export interface AssignmentItem {
+  position: number;
+  ticket_id: string;
+  intent: Intent;
+  severity: Severity;
+  summary: string;
+  deadline_at: string;
+  staff_id: string | null; // null: chưa có nhân viên phù hợp để nhận
+  staff_name: string | null;
+  reason: string;
+}
+
+export interface AssignmentResponse {
+  total: number;
+  assigned: number;
+  unassigned: number;
+  staff: StaffLoad[];
+  items: AssignmentItem[];
+}

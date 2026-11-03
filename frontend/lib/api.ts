@@ -1,5 +1,6 @@
 // Gọi FastAPI. Cách viết lấy từ buổi 4: một hàm request() dùng chung, đọc lỗi từ "detail".
 import type {
+  AssignmentResponse,
   BookingOut,
   CheckOut,
   ConfirmResponse,
@@ -28,6 +29,7 @@ import type {
   Sample,
   ScheduleOut,
   SlotOut,
+  StaffMember,
   SubmissionOut,
   TicketExtraction,
 } from "./types";
@@ -96,6 +98,11 @@ export const api = {
     request<ConfirmResponse>("/tickets/confirm", { method: "POST", body: JSON.stringify({ run_id: runId, ticket }) }),
   queue: (limit: number) => request<QueueResponse>(`/tickets/queue?limit=${limit}`),
   next: () => request<QueueItem>("/tickets/next", { method: "POST" }),
+  // Bài 01 (làm thêm)
+  staff: () => request<StaffMember[]>("/tickets/staff"),
+  saveStaff: (staff: StaffMember[]) =>
+    request<StaffMember[]>("/tickets/staff", { method: "PUT", body: JSON.stringify({ staff }) }),
+  assignments: () => request<AssignmentResponse>("/tickets/assignments"),
 
   // Bài 02
   dockSamples: () => request<DockSample[]>("/docks/samples"),

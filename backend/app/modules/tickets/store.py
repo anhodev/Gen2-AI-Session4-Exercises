@@ -2,13 +2,15 @@
 
 Heap nằm trong bộ nhớ để thêm/lấy nhanh O(log n). Database giữ bản lâu dài:
 khi app khởi động lại, load_queue() đọc các ticket còn "queued" và dựng lại heap.
+
+Làm thêm: danh sách nhân viên (bảng ticket_staff). seed_staff() tạo 3 người mẫu nếu bảng còn trống.
 """
 
 from __future__ import annotations
 
 from datetime import datetime, timezone, tzinfo
 
-from sqlalchemy import select
+from sqlalchemy import delete, func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -16,9 +18,9 @@ from app.core.database import as_utc, to_utc
 from app.core.entities import Run, now_utc
 from app.core.runs import mark_confirmed, mark_rejected
 
-from .algo import SLA, DuplicateTicketError, QueuedTicket, TicketQueue, make_ticket
-from .entities import Ticket, TicketNumber
-from .schemas import TicketExtraction
+from .algo import SLA, DuplicateTicketError, QueuedTicket, Staff, TicketQueue, id_key, make_ticket
+from .entities import Ticket, TicketNumber, TicketStaff
+from .schemas import StaffOut, TicketExtraction
 
 
 def new_ticket_id(db: Session) -> str:
@@ -159,3 +161,51 @@ def mark_done(db: Session, ticket_id: str) -> Ticket | None:
     row.popped_at = now_utc()
     db.commit()
     return row
+
+
+# --- Làm thêm: nhân viên nhận ticket -------------------------------------------
+
+# Không ai làm "other": ticket mơ hồ sẽ hiện là "chưa có nhân viên phù hợp", đúng tình huống đề muốn chỉ ra
+SEED_STAFF = [
+    ("NV01", "An", ["billing", "account"], 2),
+    ("NV02", "Bình", ["technical"], 2),
+    ("NV03", "Chi", ["technical", "account"], 1),
+]
+
+
+def seed_staff(db: Session) -> bool:
+    """
+    Tạo 3 nhân viên mẫu nếu bảng ticket_staff còn trống.
+
+    Returns:
+        bool: True nếu vừa seed, False nếu đã có dữ liệu.
+    """
+    if db.scalar(select(func.count()).select_from(TicketStaff)):
+        return False
+    db.add_all(
+        TicketStaff(staff_id=sid, name=name, skills=skills, max_tickets=cap, updated_at=now_utc())
+        for sid, name, skills, cap in SEED_STAFF
+    )
+    db.commit()
+    return True
+
+
+def list_staff(db: Session) -> list[StaffOut]:
+    rows = db.scalars(select(TicketStaff))
+    out = [StaffOut(staff_id=r.staff_id, name=r.name, skills=r.skills, max_tickets=r.max_tickets) for r in rows]
+    return sorted(out, key=lambda s: id_key(s.staff_id))
+
+
+def replace_staff(db: Session, staff: list[StaffOut]) -> list[StaffOut]:
+    """Thay cả danh sách nhân viên trong một lần commit (đã kiểm tra bằng validate_staff)."""
+    db.execute(delete(TicketStaff))
+    db.add_all(
+        TicketStaff(staff_id=s.staff_id, name=s.name, skills=list(s.skills), max_tickets=s.max_tickets, updated_at=now_utc())
+        for s in staff
+    )
+    db.commit()
+    return list_staff(db)
+
+
+def to_algo_staff(staff: list[StaffOut]) -> list[Staff]:
+    return [Staff(s.staff_id, s.name, frozenset(s.skills), s.max_tickets) for s in staff]

@@ -38,7 +38,7 @@ Bài tập Gen2-AI: 4 tình huống doanh nghiệp ghép thành **một ứng d�
 │   └── tests/
 ├── frontend/
 │   ├── app/                     # trang chính + proxy /api -> FastAPI
-│   ├── components/              # TicketWorkspace, DockWorkspace, ExpenseWorkspace, PlanWorkspace, RunHistory, ui
+│   ├── components/              # TicketWorkspace (+ TicketAssignments), DockWorkspace, ExpenseWorkspace, PlanWorkspace, RunHistory, ui
 │   └── lib/                     # api.ts, types.ts
 └── docs/                        # tài liệu, JSON Schema, ảnh chụp từng bài
 ```
@@ -97,7 +97,7 @@ cd backend
 myenv/bin/python -m pytest -q
 ```
 
-Hiện có 930 test, chạy trong khoảng 8 giây. Test không gọi GenAI và không cần Supabase (dùng mock và SQLite tạm).
+Hiện có 1125 test, chạy trong khoảng 9 giây. Test không gọi GenAI và không cần Supabase (dùng mock và SQLite tạm).
 
 ## Dữ liệu
 

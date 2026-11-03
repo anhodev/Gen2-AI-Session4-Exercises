@@ -310,3 +310,31 @@ code { font-family:ui-monospace, SFMono-Regular, Menlo, monospace; font-size:.92
 .stage-label em { font-style:normal; font-weight:600; text-transform:none; letter-spacing:0; color:var(--muted); }
 .stage-task { display:flex; gap:8px; align-items:flex-start; background:#fff; border:1px solid var(--line); border-radius:9px; padding:7px 8px; font-size:12px; line-height:1.4; }
 .stage-task small { display:block; font-size:11px; color:var(--muted); }
+
+/* --- Bài 01 (làm thêm): giao ticket cho nhân viên --- */
+.staff-loads { display:grid; grid-template-columns:repeat(auto-fill, minmax(170px, 1fr)); gap:10px; }
+.staff-load { border:1px solid var(--line); border-radius:11px; padding:10px; display:flex; flex-direction:column; gap:6px; background:#faf9fd; }
+.staff-load-head { display:flex; align-items:center; gap:8px; }
+.staff-load-head strong { font-size:13px; flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.staff-count { font-size:12px; font-weight:800; color:#5b3fe0; }
+.staff-load.full .staff-count { color:var(--amber); }
+.staff-load small { font-size:11px; color:var(--muted); line-height:1.4; }
+.load-bar { height:6px; border-radius:99px; background:#ebe7f3; overflow:hidden; }
+.load-bar i { display:block; height:100%; background:var(--purple); border-radius:99px; }
+.staff-load.full .load-bar i { background:#d58722; }
+.unassigned-note { margin:0; display:flex; align-items:center; gap:6px; font-size:12px; font-weight:700; color:var(--red); background:var(--red-bg); border-radius:9px; padding:8px 11px; }
+.data-table tr.unassigned td { background:#fff6f7; }
+.staff-editor { border:1px solid var(--line); border-radius:11px; padding:10px 12px; display:flex; flex-direction:column; gap:8px; }
+.staff-editor[open] { display:flex; }
+.staff-editor summary { cursor:pointer; font-size:12px; font-weight:700; color:#6954bb; display:flex; align-items:center; gap:6px; }
+.staff-editor > * + * { margin-top:8px; }
+.staff-row { display:flex; flex-direction:column; gap:6px; padding:8px; border:1px solid var(--line); border-radius:10px; }
+.staff-line { display:flex; align-items:center; gap:6px; }
+.staff-line > input { flex:1; min-width:0; border:1px solid #ddd9e2; border-radius:8px; padding:7px 9px; outline:none; }
+.max-input { display:flex; align-items:center; gap:5px; font-size:11px; color:var(--muted); white-space:nowrap; }
+.max-input input { width:58px; border:1px solid #ddd9e2; border-radius:8px; padding:7px 6px; }
+.skill-chips { display:flex; gap:6px; flex-wrap:wrap; }
+.skill-chips button { border:1px solid #ded9ec; background:#fff; color:#8a8592; border-radius:20px; padding:4px 10px; font-size:11px; font-weight:700; }
+.skill-chips button.on { background:#efeaff; border-color:#c9bdff; color:#5b3fe0; }
+.assign-table th, .assign-table td { padding-left:10px; padding-right:10px; }
+.assign-table .reason { min-width:170px; }

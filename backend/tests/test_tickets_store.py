@@ -10,8 +10,16 @@ from app.core.llm import LLMResult
 from app.core.runs import create_run
 from app.modules.tickets.algo import DuplicateTicketError
 from app.modules.tickets.entities import Ticket
-from app.modules.tickets.schemas import TicketExtraction
-from app.modules.tickets.store import load_queue, mark_done, new_ticket_id, save_ticket
+from app.modules.tickets.schemas import StaffOut, TicketExtraction
+from app.modules.tickets.store import (
+    list_staff,
+    load_queue,
+    mark_done,
+    new_ticket_id,
+    replace_staff,
+    save_ticket,
+    seed_staff,
+)
 
 VN = timezone(timedelta(hours=7))
 
@@ -154,3 +162,22 @@ def test_new_ticket_id_skips_existing_ticket(db):
     # T02 đã có sẵn (vd nhập tay trước đây) -> bộ sinh mã bỏ qua, không cấp trùng
     save_ticket(db, extraction("T02", "high"), at(9))
     assert [new_ticket_id(db) for _ in range(2)] == ["T01", "T03"]
+
+
+# --- Làm thêm: danh sách nhân viên -------------------------------------------
+
+
+def test_seed_staff_only_when_empty(db):
+    assert seed_staff(db) is True
+    assert [s.staff_id for s in list_staff(db)] == ["NV01", "NV02", "NV03"]
+    assert seed_staff(db) is False
+
+
+def test_replace_staff_replaces_whole_list_sorted_by_number(db):
+    seed_staff(db)
+    saved = replace_staff(db, [
+        StaffOut(staff_id="NV10", name="Mười", skills=["billing"], max_tickets=1),
+        StaffOut(staff_id="NV02", name="Hai", skills=["technical"], max_tickets=2),
+    ])
+    assert [s.staff_id for s in saved] == ["NV02", "NV10"]
+    assert [s.staff_id for s in list_staff(db)] == ["NV02", "NV10"]
