@@ -8,7 +8,7 @@ from app.core.config import Settings
 from app.core.llm import LLMResult, call_mock, load_samples
 from app.core.timeutil import get_tz
 from app.modules.docks import extractor
-from app.modules.docks.extractor import build_user_prompt, extract_dock_request
+from app.modules.docks.extractor import SYSTEM_PROMPT, build_user_prompt, extract_dock_request
 from app.modules.docks.schemas import ExtractRequest
 
 SAMPLES = load_samples("docks")
@@ -139,3 +139,13 @@ def test_mock_fills_placeholder_without_changing_sample_file(tmp_path):
     second = call_mock("demo", "xe đến", tmp_path, {"request_id": "R002"})
     assert first.raw == {"request_id": "R001", "tags": ["R001", "x"]}
     assert second.raw["request_id"] == "R002"  # mẫu gốc không bị sửa sau lần đầu
+
+
+@pytest.mark.parametrize("rule", [
+    "KHÔNG tự đổi sang UTC",                    # giờ trong email là giờ kho, giữ nguyên
+    "Ô nào đã có giá trị thì KHÔNG ghi vào",    # missing_fields chỉ ghi ô đang null
+    "Email đủ thông tin thì để []",
+    "KHÔNG tự đoán từ loại hàng",               # thời lượng
+])
+def test_system_prompt_states_rules(rule):
+    assert rule in SYSTEM_PROMPT

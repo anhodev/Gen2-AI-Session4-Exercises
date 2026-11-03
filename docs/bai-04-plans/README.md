@@ -209,7 +209,7 @@ Chạy `cd backend && myenv/bin/python -m pytest -q`. Thuật toán được tes
 |---|---|---|
 | [`test_plans_algo.py`](../../backend/tests/test_plans_algo.py) | 328 | Thuật toán thuần, chia 3 nhóm theo đề: ca thường, ca sát giới hạn, dữ liệu sai. So với brute force trên 200 đồ thị ngẫu nhiên, 10.000 việc dưới 1 giây, vòng 50.000 việc. Chia đợt: kiểm tra trên 100 đồ thị ngẫu nhiên rằng mũi tên luôn sang đợt sau và mỗi việc ở đợt sớm nhất |
 | [`test_plans_validation.py`](../../backend/tests/test_plans_validation.py) | 57 | Mẫu JSON, kiểm tra 2 lớp, cấp mã, câu bằng chứng, từng biên bản mẫu |
-| [`test_plans_extractor.py`](../../backend/tests/test_plans_extractor.py) | 29 | GenAI (mock và giả lập lỗi model), prompt, schema đổi sang tool OpenAI |
+| [`test_plans_extractor.py`](../../backend/tests/test_plans_extractor.py) | 33 | GenAI (mock và giả lập lỗi model), prompt, schema đổi sang tool OpenAI |
 | [`test_plans_store.py`](../../backend/tests/test_plans_store.py) | 6 | Database: mỗi lần tính một dòng, đánh số lần tính, cập nhật run, trùng số lần tính thì hoàn tác |
 | [`test_plans_api.py`](../../backend/tests/test_plans_api.py) | 23 | Toàn bộ API bằng `TestClient`, lưu lại sau khi khởi động lại app, đọc được lần tính lưu trước khi có chia đợt, 409 khi hai request tính cùng lúc |
 
@@ -250,6 +250,26 @@ Chạy `cd backend && myenv/bin/python -m pytest -q`. Thuật toán được tes
 
 Chế độ mock chọn mẫu **dài nhất** có nội dung nằm trong prompt. Biên bản mẫu 2 chứa trọn mẫu 1, nên nếu lấy mẫu khớp đầu tiên thì sẽ nhận nhầm kết quả của mẫu 1.
 
+### Chạy thử với model thật (gpt-4o-mini)
+
+Gửi mọi mẫu qua API với OpenAI (database là SQLite tạm). Mẫu 1, 2, 6 chạy lặp 5 lần.
+
+| Kiểm tra | Trước khi sửa prompt | Sau khi sửa |
+|---|---|---|
+| Mẫu 1 (ví dụ của đề): đủ 3 quan hệ, đúng chiều | 5/5 | 5/5 |
+| Mẫu 2: có D → A nên báo vòng | 5/5 (lượt chạy đầu có 1 lần đảo chiều mũi tên) | 5/5 |
+| Mẫu 6 (7 việc): đủ cả 8 quan hệ | 0/5 | 2/5 |
+| Người phụ trách đúng như biên bản | Thường để `null` | Đúng ở mọi mẫu, trừ 1 ô |
+| Mẫu 10: không tự thêm quan hệ | Đúng | Đúng |
+
+Prompt được sửa ở 4 điểm:
+- Một câu có thể cho nhiều quan hệ: "C khi A và B đều xong" là A → C và B → C.
+- Đọc hết cả câu thứ hai, thứ ba trong cùng một dòng.
+- Tự soát lại chiều từng mũi tên so với câu bằng chứng.
+- Chủ ngữ của câu giao việc là người phụ trách.
+
+Các mẫu `[Lỗi]` giả lập lỗi của GenAI để test code. Model thật thường đọc đúng nên không tái hiện được những lỗi này.
+
 ## 9. Ảnh chụp luồng chính
 
 **Xem và sửa (mẫu 1):** mã T01–T04 bị khóa. Câu bằng chứng nằm dưới mỗi quan hệ. Người dùng thêm việc "Phát hành bản checkout mới" (backend cấp T05) và quan hệ T04 → T05 không có câu trong biên bản.
@@ -280,6 +300,7 @@ Chế độ mock chọn mẫu **dài nhất** có nội dung nằm trong prompt.
 
 - **Thứ tự và đợt không phải lịch.** App chỉ nói việc nào trước việc nào và việc nào làm cùng lúc được. Không có thời lượng hay số người nên không tự đổi thành ngày giờ, và không nói một đợt cần bao nhiêu người.
 - **Lần tính lưu trước khi có chia đợt** vẫn đọc lại được, chỉ là không có đợt (`stages` rỗng, `stage` là `null`).
+- **Quan hệ bị GenAI bỏ sót không được phát hiện tự động.** Code bắt được quan hệ thừa (câu bằng chứng không có trong biên bản), nhưng không biết biên bản còn câu nào chưa được đọc thành quan hệ. Với biên bản dài, `gpt-4o-mini` vẫn có lúc bỏ sót 1–2 quan hệ (mẫu 6 ở trên), nên người dùng cần đọc lại danh sách ở bước 2 trước khi tính.
 - **Chỉ báo một vòng.** Đồ thị có nhiều vòng thì sửa vòng này, tính lại sẽ thấy vòng tiếp theo. Danh sách `blocked` cho biết mọi việc đang bị kẹt.
 - **Câu bằng chứng chỉ được so khớp chuỗi**, sau khi chuẩn hóa. GenAI viết lại câu bằng lời khác thì bị cảnh báo dù quan hệ đúng. Ngược lại, câu có thật trong biên bản không chứng minh GenAI hiểu đúng hướng mũi tên. Người dùng vẫn cần đọc lại.
 - **Mã việc chỉ có nghĩa trong một kế hoạch.** Xóa T04 rồi thêm việc mới thì việc mới có thể nhận lại T04. Các lần tính cũ vẫn đúng vì mỗi lần lưu cả tên việc.

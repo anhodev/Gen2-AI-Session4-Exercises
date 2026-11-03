@@ -30,7 +30,7 @@ class DockRequestExtraction(BaseModel):
         ...,
         description=(
             "Giờ sớm nhất xe có thể đến, dạng ISO 8601, ví dụ 2026-10-21T09:00:00. "
-            "Giờ trong email là giờ địa phương của kho. null nếu email không ghi giờ đến."
+            "Giờ trong email là giờ địa phương của kho: giữ nguyên, không đổi sang UTC. null nếu email không ghi giờ đến."
         ),
     )
     duration_minutes: int | None = Field(
@@ -47,7 +47,10 @@ class DockRequestExtraction(BaseModel):
     )
     missing_fields: list[MissingField] = Field(
         ...,
-        description="Tên các ô để null vì email không có thông tin. Ví dụ ['duration_minutes'].",
+        description=(
+            "Đúng những ô đang để null trong câu trả lời này (carrier, earliest_start, duration_minutes). "
+            "Ô đã có giá trị thì không ghi. Đủ thông tin thì []."
+        ),
     )
 
 

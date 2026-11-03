@@ -170,7 +170,7 @@ Chạy `cd backend && myenv/bin/python -m pytest -q`. Thuật toán được tes
 |---|---|---|
 | [`test_docks_algo.py`](../../backend/tests/test_docks_algo.py) | 63 | Thuật toán thuần, so với brute force trên 30 lịch ngẫu nhiên, 10.000 lịch dưới 1 giây, thời gian dọn cửa |
 | [`test_docks_validation.py`](../../backend/tests/test_docks_validation.py) | 28 | Mẫu JSON, kiểm tra 2 lớp, múi giờ |
-| [`test_docks_extractor.py`](../../backend/tests/test_docks_extractor.py) | 22 | GenAI (mock), prompt, từng mẫu trong `samples/docks.json` |
+| [`test_docks_extractor.py`](../../backend/tests/test_docks_extractor.py) | 26 | GenAI (mock), prompt, từng mẫu trong `samples/docks.json` |
 | [`test_docks_store.py`](../../backend/tests/test_docks_store.py) | 18 | Database: seed, mã tuần tự, khóa, trùng giờ, DDL có `EXCLUDE` |
 | [`test_docks_api.py`](../../backend/tests/test_docks_api.py) | 27 | Toàn bộ API bằng `TestClient`, có test 2 thread xác nhận cùng lúc và test bật 15 phút dọn cửa |
 
@@ -203,6 +203,23 @@ Chạy `cd backend && myenv/bin/python -m pytest -q`. Thuật toán được tes
 | Đến sau giờ đóng cửa | 18:30: cảnh báo, tìm giờ ra `no_slot` |
 | [Lỗi] Giờ kết thúc trước giờ bắt đầu | GenAI trả `duration_minutes = -60`: bị chặn |
 | [Lỗi] GenAI tự đặt mã | GenAI chép "R01" trong email thay vì mã hệ thống cấp: đúng khuôn nhưng sai nội dung |
+
+### Chạy thử với model thật (gpt-4o-mini)
+
+Gửi mỗi mẫu 3 lần qua API với OpenAI (database là SQLite tạm).
+
+| Kiểm tra | Trước khi sửa prompt | Sau khi sửa |
+|---|---|---|
+| R01 (ví dụ của đề) ra cửa B 10:15–11:15, xe sau ra A 11:00 | Đúng | Đúng |
+| Mẫu 1–6 cho kết quả "gợi ý được giờ hay chưa" đúng như mong đợi | 17/18 | 18/18 |
+| JSON sai khuôn, bị chặn ngay ở lớp 1 | 1/24 lần | 0/24 |
+| `missing_fields` không khớp với các ô đang `null` | 10/24 lần | 7/24 lần |
+
+Prompt được sửa ở 2 điểm:
+- `missing_fields` chỉ ghi những ô đang để `null`; email đủ thông tin thì để `[]`.
+- Giữ nguyên giờ ghi trong email, không tự đổi sang UTC. Ở lượt chạy đầu, model từng đổi "13 giờ" thành `06:00` mà bỏ mất múi giờ.
+
+`missing_fields` sai chỉ làm hiện cảnh báo: code tự so với các ô đang `null`, nên không ảnh hưởng tới giờ được gợi ý.
 
 ## 9. Ảnh chụp luồng chính
 

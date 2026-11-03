@@ -148,6 +148,10 @@ def test_minutes_are_wrapped_as_data():
     "để null, không đoán",          # owner
     "Không dùng tên việc làm mã",   # mã task
     "Không tự sắp xếp thứ tự",      # thứ tự là việc của code
+    "Một câu có thể cho NHIỀU quan hệ",  # câu ghép: "C khi A và B đều xong" -> A -> C, B -> C
+    "kể cả câu thứ hai",            # không bỏ sót câu sau trong cùng một dòng
+    "đọc lại từng quan hệ",         # tự soát chiều mũi tên
+    "Chủ ngữ của câu giao việc là người phụ trách",  # owner: "Design thiết kế…" -> Design
 ])
 def test_system_prompt_states_rules(rule):
     assert rule in SYSTEM_PROMPT

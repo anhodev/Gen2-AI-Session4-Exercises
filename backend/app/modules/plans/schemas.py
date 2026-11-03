@@ -72,6 +72,7 @@ class PlanExtraction(BaseModel):
         max_length=MAX_DEPENDENCIES,
         description=(
             "Quan hệ trước-sau: 'before' phải xong rồi mới làm 'after'. Chỉ ghi khi biên bản nói rõ, kèm câu bằng chứng. "
+            "Một câu nhắc nhiều việc phải chờ thì ghi mỗi cặp một dòng. "
             "Không tự suy ra quan hệ từ kinh nghiệm. Không có quan hệ nào thì để []."
         ),
     )

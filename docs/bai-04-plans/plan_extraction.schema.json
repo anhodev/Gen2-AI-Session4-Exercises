@@ -77,7 +77,7 @@
   "description": "Danh sách việc và quan hệ trước-sau GenAI đọc ra từ biên bản họp.",
   "properties": {
     "dependencies": {
-      "description": "Quan hệ trước-sau: 'before' phải xong rồi mới làm 'after'. Chỉ ghi khi biên bản nói rõ, kèm câu bằng chứng. Không tự suy ra quan hệ từ kinh nghiệm. Không có quan hệ nào thì để [].",
+      "description": "Quan hệ trước-sau: 'before' phải xong rồi mới làm 'after'. Chỉ ghi khi biên bản nói rõ, kèm câu bằng chứng. Một câu nhắc nhiều việc phải chờ thì ghi mỗi cặp một dòng. Không tự suy ra quan hệ từ kinh nghiệm. Không có quan hệ nào thì để [].",
       "items": {
         "$ref": "#/$defs/DependencyExtraction"
       },
