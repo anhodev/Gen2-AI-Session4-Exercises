@@ -249,3 +249,78 @@ export interface ReviewOut {
   submission: SubmissionOut;
   result: CheckOut | null;
 }
+
+// --- Bài 04: khớp với backend/app/modules/plans/schemas.py ---
+
+export interface PlanTask {
+  id: string | null; // mã backend cấp (T01…); null với việc mới thêm, chưa có mã
+  title: string;
+  owner: string | null;
+}
+
+export interface PlanDependency {
+  before: string;
+  after: string;
+  evidence: string | null; // câu trong biên bản; null với quan hệ người dùng tự thêm
+}
+
+export interface Plan {
+  tasks: PlanTask[];
+  dependencies: PlanDependency[];
+}
+
+export interface PlanSample {
+  label: string;
+  note: string;
+  text: string;
+}
+
+export interface PlanExtractResponse {
+  run_id: number | null;
+  llm_output: Record<string, unknown> | null; // JSON GenAI trả, mã tạm A, B…
+  llm_issues: Issue[];                        // vấn đề của JSON gốc
+  plan: Plan | null;                          // đã đổi sang mã T01…
+  issues: Issue[];                            // vấn đề của plan, đúng dòng người dùng sửa
+  can_order: boolean;
+}
+
+export interface PlanValidateOut {
+  plan: Plan | null;
+  issues: Issue[];
+  can_order: boolean;
+}
+
+export type OrderStatus = "ordered" | "cycle_detected";
+
+export interface OrderStep {
+  position: number;
+  task: PlanTask;
+  waits_for: string[];
+  reason: string;
+}
+
+export interface OrderOut {
+  order_id: number;
+  run_id: number;
+  version: number;
+  status: OrderStatus;
+  reason: string;
+  steps: OrderStep[];                    // rỗng khi có vòng
+  cycle: string[];                       // vd ["T01", "T03", "T04", "T01"]
+  cycle_dependencies: PlanDependency[];
+  blocked: PlanTask[];
+  plan: Plan;
+  warnings: Issue[];
+  created_at: string;
+}
+
+export interface OrderSummary {
+  order_id: number;
+  run_id: number;
+  version: number;
+  status: OrderStatus;
+  reason: string;
+  task_count: number;
+  dependency_count: number;
+  created_at: string;
+}

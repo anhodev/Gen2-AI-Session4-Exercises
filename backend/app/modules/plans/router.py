@@ -10,12 +10,14 @@
 
 from __future__ import annotations
 
+from zoneinfo import ZoneInfo
+
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from app.core.config import Settings
 from app.core.database import as_utc
-from app.core.dependencies import get_app_settings, get_db
+from app.core.dependencies import get_app_settings, get_db, get_display_tz
 from app.core.entities import Run
 from app.core.llm import load_samples
 from app.core.runs import create_run
@@ -93,7 +95,7 @@ def validate(payload: PlanRequest, db: Session = Depends(get_db)):
 
 
 @router.post("/order", response_model=OrderOut)
-def order(payload: PlanRequest, db: Session = Depends(get_db)):
+def order(payload: PlanRequest, db: Session = Depends(get_db), tz: ZoneInfo = Depends(get_display_tz)):
     """
     Tính thứ tự công việc từ bản người dùng đã xác nhận, rồi lưu lần tính này.
 
@@ -117,7 +119,7 @@ def order(payload: PlanRequest, db: Session = Depends(get_db)):
         raise HTTPException(status_code=400, detail=str(exc))
 
     row = save_order(db, run, plan, result, issues)
-    return to_order_out(row)
+    return to_order_out(row, tz)
 
 
 @router.get("/orders", response_model=list[OrderSummary])
@@ -125,6 +127,7 @@ def orders(
     run_id: int | None = None,
     limit: int = Query(20, ge=1, le=100),
     db: Session = Depends(get_db),
+    tz: ZoneInfo = Depends(get_display_tz),
 ):
     """Lịch sử các lần tính, mới nhất trước. Truyền run_id để xem các lần tính của một biên bản."""
     return [
@@ -136,14 +139,14 @@ def orders(
             reason=row.result["reason"],
             task_count=len(row.tasks),
             dependency_count=len(row.dependencies),
-            created_at=as_utc(row.created_at),
+            created_at=as_utc(row.created_at).astimezone(tz),
         )
         for row in list_orders(db, run_id, limit)
     ]
 
 
 @router.get("/orders/{order_id}", response_model=OrderOut)
-def order_detail(order_id: int, db: Session = Depends(get_db)):
+def order_detail(order_id: int, db: Session = Depends(get_db), tz: ZoneInfo = Depends(get_display_tz)):
     """
     Một lần tính, đúng như lúc tính (đọc từ database, không tính lại).
 
@@ -153,7 +156,7 @@ def order_detail(order_id: int, db: Session = Depends(get_db)):
     row = get_order(db, order_id)
     if row is None:
         raise HTTPException(status_code=404, detail="Không tìm thấy lần tính này")
-    return to_order_out(row)
+    return to_order_out(row, tz)
 
 
 # --- Hàm phụ ----------------------------------------------------------------
@@ -171,14 +174,14 @@ def get_plan_run(db: Session, run_id: int) -> Run:
     return run
 
 
-def to_order_out(row: PlanOrder) -> OrderOut:
-    """Đổi dòng trong database sang dạng trả về của API."""
+def to_order_out(row: PlanOrder, tz: ZoneInfo) -> OrderOut:
+    """Đổi dòng trong database sang dạng trả về của API. Giờ đổi sang múi giờ app (database lưu UTC)."""
     return OrderOut(
         order_id=row.id,
         run_id=row.run_id,
         version=row.version,
         plan=PlanOut(tasks=row.tasks, dependencies=row.dependencies),
         warnings=[Issue(**w) for w in row.warnings],
-        created_at=as_utc(row.created_at),
+        created_at=as_utc(row.created_at).astimezone(tz),
         **row.result,
     )

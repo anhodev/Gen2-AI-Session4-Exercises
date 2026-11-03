@@ -3,7 +3,7 @@
 // Khung trang lấy từ buổi 4: sidebar tối + topbar + nội dung theo từng màn hình.
 import { useEffect, useState } from "react";
 import {
-  AlertTriangle, Bot, Boxes, Command, Database, FileSearch, GitBranch, History, Inbox, Menu, Truck, X,
+  AlertTriangle, Bot, Command, Database, FileSearch, GitBranch, History, Inbox, Menu, Truck, X,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { api } from "@/lib/api";
@@ -11,6 +11,7 @@ import type { Health } from "@/lib/types";
 import TicketWorkspace from "@/components/TicketWorkspace";
 import DockWorkspace from "@/components/DockWorkspace";
 import ExpenseWorkspace from "@/components/ExpenseWorkspace";
+import PlanWorkspace from "@/components/PlanWorkspace";
 import RunHistory from "@/components/RunHistory";
 
 type View = "tickets" | "docks" | "expenses" | "plans" | "history";
@@ -19,14 +20,14 @@ const NAV: { id: View; label: string; icon: LucideIcon; ready: boolean }[] = [
   { id: "tickets", label: "01 · Ưu tiên ticket", icon: Inbox, ready: true },
   { id: "docks", label: "02 · Giờ nhận xe", icon: Truck, ready: true },
   { id: "expenses", label: "03 · Hóa đơn trùng", icon: FileSearch, ready: true },
-  { id: "plans", label: "04 · Thứ tự công việc", icon: GitBranch, ready: false },
+  { id: "plans", label: "04 · Thứ tự công việc", icon: GitBranch, ready: true },
 ];
 
 const TITLES: Record<View, [string, string]> = {
   tickets: ["Khách hàng nào cần được hỗ trợ trước?", "GenAI đọc tin nhắn và điền mẫu JSON. Code tính hạn xử lý (SLA) và xếp hàng đợi bằng min-heap."],
   docks: ["Xe giao hàng nên vào cửa kho lúc mấy giờ?", "GenAI đọc email đặt lịch. Code gộp khoảng bận của từng cửa và chọn cửa trống sớm nhất. Giờ hiển thị theo múi giờ kho."],
   expenses: ["Hóa đơn này đã được gửi trước đó chưa?", "GenAI đọc chứng từ. Code tạo nhãn tra cứu và dùng hash map tìm bản có thể trùng. Người duyệt quyết định, hệ thống không tự kết luận gian lận."],
-  plans: ["Việc nào phải làm trước?", "Sắp có."],
+  plans: ["Việc nào phải làm trước?", "GenAI đọc biên bản họp, tìm việc và quan hệ trước-sau kèm câu bằng chứng. Code xếp thứ tự bằng topological sort và báo khi các việc chờ nhau thành vòng."],
   history: ["Lịch sử xử lý", "Nội dung gốc, JSON GenAI trả, bản người dùng sửa, kết quả cuối và thời gian xử lý."],
 };
 
@@ -88,8 +89,8 @@ export default function Home() {
         {view === "tickets" && <TicketWorkspace llmMode={health?.llm ?? "mock"} />}
         {view === "docks" && <DockWorkspace llmMode={health?.llm ?? "mock"} />}
         {view === "expenses" && <ExpenseWorkspace llmMode={health?.llm ?? "mock"} />}
+        {view === "plans" && <PlanWorkspace llmMode={health?.llm ?? "mock"} />}
         {view === "history" && <RunHistory />}
-        {!["tickets", "docks", "expenses", "history"].includes(view) && <div className="panel"><div className="empty"><Boxes size={25} /><span>Bài này sẽ làm ở các phần sau.</span></div></div>}
       </main>
     </div>
   );

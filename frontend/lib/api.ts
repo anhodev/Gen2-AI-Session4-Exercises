@@ -13,7 +13,13 @@ import type {
   ExtractResponse,
   Health,
   Issue,
+  OrderOut,
+  OrderSummary,
   PdfTextOut,
+  Plan,
+  PlanExtractResponse,
+  PlanSample,
+  PlanValidateOut,
   QueueItem,
   QueueResponse,
   ReviewAction,
@@ -45,7 +51,7 @@ function issuesFromDetail(detail: unknown): Issue[] {
     if (item && typeof item === "object" && "field" in item) return item as Issue;
     const loc = Array.isArray(item?.loc) ? item.loc : [];
     // Bỏ phần tiền tố không cần cho người dùng: ["body", "ticket", "severity"] -> "severity"
-    const field = loc.filter((p: unknown) => !["body", "ticket", "request", "expense", "query"].includes(String(p))).join(".");
+    const field = loc.filter((p: unknown) => !["body", "ticket", "request", "expense", "plan", "query"].includes(String(p))).join(".");
     return { field: field || "(toàn bộ)", message: String(item?.msg ?? "Dữ liệu không hợp lệ"), level: "error" };
   });
 }
@@ -127,6 +133,17 @@ export const api = {
       body: JSON.stringify({ submission_id: submissionId, action, expense, note: note.trim() || null }),
     }),
   expenseSubmissions: (limit = 20) => request<SubmissionOut[]>(`/expenses/submissions?limit=${limit}`),
+
+  // Bài 04
+  planSamples: () => request<PlanSample[]>("/plans/samples"),
+  planExtract: (text: string) =>
+    request<PlanExtractResponse>("/plans/extract", { method: "POST", body: JSON.stringify({ text }) }),
+  planValidate: (runId: number, plan: Plan) =>
+    request<PlanValidateOut>("/plans/validate", { method: "POST", body: JSON.stringify({ run_id: runId, plan }) }),
+  planOrder: (runId: number, plan: Plan) =>
+    request<OrderOut>("/plans/order", { method: "POST", body: JSON.stringify({ run_id: runId, plan }) }),
+  planOrders: (runId: number, limit = 20) => request<OrderSummary[]>(`/plans/orders?run_id=${runId}&limit=${limit}`),
+  planOrderDetail: (orderId: number) => request<OrderOut>(`/plans/orders/${orderId}`),
 
   runs: (module: string, limit = 30) => request<Run[]>(`/runs?module=${module}&limit=${limit}`),
 };

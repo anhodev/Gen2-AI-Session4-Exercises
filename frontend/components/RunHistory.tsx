@@ -14,6 +14,7 @@ const MODULES = [
   { id: "tickets", label: "01 · Ticket" },
   { id: "docks", label: "02 · Giờ nhận xe" },
   { id: "expenses", label: "03 · Hóa đơn trùng" },
+  { id: "plans", label: "04 · Thứ tự công việc" },
 ];
 
 export default function RunHistory() {

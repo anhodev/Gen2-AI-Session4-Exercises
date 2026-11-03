@@ -227,3 +227,10 @@ def test_orders_survive_restart(tmp_path):
         order_id = order(c, data["run_id"], data["plan"]).json()["order_id"]
     with TestClient(create_app(settings)) as c:
         assert ids(c.get(f"/plans/orders/{order_id}").json()["steps"]) == ["T01", "T02", "T03", "T04"]
+
+
+def test_times_are_shown_in_app_timezone(client):
+    data = extract(client, 1)
+    out = order(client, data["run_id"], data["plan"]).json()
+    history = client.get("/plans/orders").json()
+    assert out["created_at"].endswith("+07:00") and history[0]["created_at"].endswith("+07:00")
