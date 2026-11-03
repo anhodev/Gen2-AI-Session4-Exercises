@@ -201,7 +201,8 @@ def review(db: Session, submission_id: str, action: str, note: str | None = None
         raise NotCheckedError(f"Chứng từ {submission_id} chưa được kiểm tra trùng")
     if row.review_status is None:
         raise InvalidReviewError(f"Chứng từ {submission_id} chưa trùng theo quy tắc hiện tại, không có gì để duyệt")
-    if action == "confirm_duplicate" and row.check_status != DUPLICATE:
+    # Có chứng từ cũ (trùng hoặc gần giống) thì người duyệt mới xác nhận trùng được
+    if action == "confirm_duplicate" and not row.matched_ids:
         raise InvalidReviewError(f"Chứng từ {submission_id} không có bản trùng để xác nhận")
 
     snapshot = submission_to_dict(row)

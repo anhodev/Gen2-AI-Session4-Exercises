@@ -237,8 +237,12 @@ code { font-family:ui-monospace, SFMono-Regular, Menlo, monospace; font-size:.92
 .compare-table tr.diff td.note { color:var(--red); font-weight:700; }
 .compare-table tr.soft td { background:#fffbea; }
 .compare-table tr.soft td.note { color:var(--amber); }
+.compare-table tr.similar td { background:#eef4ff; }
+.compare-table tr.similar td.note { color:#3976ca; font-weight:700; }
+.similar-tag { font-style:normal; font-size:12px; color:#3976ca; background:#eef4ff; border-radius:999px; padding:1px 8px; }
 /* pre-wrap: vẫn thấy dấu cách thừa (vd "  abc   travel ") nhưng được xuống dòng */
-.mono { font-family:ui-monospace, SFMono-Regular, Menlo, monospace; font-size:11.5px; white-space:pre-wrap; word-break:break-all; }
+.mono { font-family:ui-monospace, SFMono-Regular, Menlo, monospace; font-size:11.5px; white-space:pre-wrap; word-break:break-all; font-variant-numeric:slashed-zero; }
+.ocr-char { background:#3976ca; color:#fff; border-radius:3px; padding:0 2px; font-weight:700; }
 .review-box { display:flex; flex-direction:column; gap:8px; }
 .review-box input { width:100%; border:1px solid #ddd9e2; border-radius:9px; padding:9px 11px; background:#fff; color:var(--ink); outline:none; }
 .review-box small { font-size:11px; opacity:.85; }

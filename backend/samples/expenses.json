@@ -44,7 +44,10 @@
       "amount_minor": 1250000,
       "currency": "VND",
       "receipt_id": null,
-      "missing_fields": ["invoice_number", "receipt_id"]
+      "missing_fields": [
+        "invoice_number",
+        "receipt_id"
+      ]
     }
   },
   {
@@ -76,7 +79,9 @@
       "amount_minor": 1250000,
       "currency": "VND",
       "receipt_id": null,
-      "missing_fields": ["receipt_id"]
+      "missing_fields": [
+        "receipt_id"
+      ]
     }
   },
   {
@@ -92,7 +97,9 @@
       "amount_minor": 980000,
       "currency": "VND",
       "receipt_id": null,
-      "missing_fields": ["receipt_id"]
+      "missing_fields": [
+        "receipt_id"
+      ]
     }
   },
   {
@@ -157,6 +164,24 @@
       "currency": "VND",
       "receipt_id": "PLR-99012",
       "missing_fields": []
+    }
+  },
+  {
+    "label": "Mẫu 11 - Số hóa đơn OCR đọc nhầm (0 thành O)",
+    "note": "Bản chụp lại của E01, OCR đọc INV-0042 thành INV-0O42 và mất trang biên nhận -> gần giống E01, cần người xem lại",
+    "input": "ABC TRAVEL - Hoa don INV-0O42\nNgay 19/10/2026\nTong: 1.250.000 VND\n(anh chup lai tu dien thoai, khong co trang bien nhan)",
+    "expect_can_check": true,
+    "llm_output": {
+      "submission_id": "{submission_id}",
+      "vendor": "ABC Travel",
+      "invoice_number": "INV-0O42",
+      "transaction_date": "2026-10-19",
+      "amount_minor": 1250000,
+      "currency": "VND",
+      "receipt_id": null,
+      "missing_fields": [
+        "receipt_id"
+      ]
     }
   }
 ]

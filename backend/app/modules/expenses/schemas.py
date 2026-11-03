@@ -129,7 +129,7 @@ class FieldDiffOut(BaseModel):
 
 class MatchOut(BaseModel):
     submission_id: str
-    matched_by: list[Literal["receipt", "invoice"]]
+    matched_by: list[Literal["receipt", "invoice", "receipt_similar", "invoice_similar"]]
     differences: list[FieldDiffOut]
     previous: SubmissionOut    # toàn bộ chứng từ cũ, để hiện cặp nghi trùng cạnh nhau
 

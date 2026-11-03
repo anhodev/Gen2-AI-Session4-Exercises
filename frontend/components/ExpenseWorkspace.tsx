@@ -30,7 +30,27 @@ const REVIEW: Record<ReviewStatus, { label: string; tone: string }> = {
   confirmed_duplicate: { label: "Đã xác nhận trùng", tone: "red" },
   dismissed: { label: "Đã bỏ nghi vấn", tone: "gray" },
 };
-const KEY_LABEL = { receipt: "mã biên nhận", invoice: "nơi bán + số hóa đơn" };
+const KEY_LABEL = {
+  receipt: "mã biên nhận",
+  invoice: "nơi bán + số hóa đơn",
+  receipt_similar: "mã biên nhận",
+  invoice_similar: "số hóa đơn",
+};
+
+/** "Trùng mã biên nhận với E01", "Số hóa đơn gần giống E01" hoặc cả hai. */
+function matchTitle(match: MatchOut) {
+  const exact = match.matched_by.filter((k) => !k.endsWith("_similar")).map((k) => KEY_LABEL[k]);
+  const similar = match.matched_by.filter((k) => k.endsWith("_similar")).map((k) => KEY_LABEL[k]);
+  return (
+    <p>
+      {exact.length > 0 && <>Trùng <strong>{exact.join(" và ")}</strong> với <strong>{match.submission_id}</strong></>}
+      {exact.length > 0 && similar.length > 0 && "; "}
+      {similar.length > 0 && (
+        <><strong>{similar.join(" và ")}</strong> gần giống {exact.length === 0 && <strong>{match.submission_id}</strong>} <em className="similar-tag">có thể do OCR đọc nhầm</em></>
+      )}
+    </p>
+  );
+}
 
 /** Bản người dùng đang sửa, giữ dạng chuỗi để hiện được cả giá trị sai GenAI trả (vd tiền âm, "EUR"). */
 interface Draft {
@@ -389,13 +409,13 @@ export default function ExpenseWorkspace({ llmMode }: { llmMode: string }) {
                     <td className="amount">{s.amount_text ?? "—"}</td>
                     <td>
                       {s.check_status && <span className={`pill ${STATUS[s.check_status].tone}`}>{STATUS[s.check_status].label}</span>}
-                      {s.matched_ids.length > 0 && <small>trùng {s.matched_ids.join(", ")}</small>}
+                      {s.matched_ids.length > 0 && <small>{s.check_status === "duplicate_candidate" ? "trùng" : "gần giống"} {s.matched_ids.join(", ")}</small>}
                     </td>
                     <td>
                       {s.review_status ? <span className={`pill ${REVIEW[s.review_status].tone}`}>{REVIEW[s.review_status].label}</span> : <small>không cần</small>}
                       {s.review_status === "pending" && s.submission_id !== extraction?.submission_id && (
                         <div className="row-actions">
-                          {s.check_status === "duplicate_candidate" && (
+                          {s.matched_ids.length > 0 && (
                             <button onClick={() => runReview(s.submission_id, "confirm_duplicate")} disabled={busy !== null}>Xác nhận trùng</button>
                           )}
                           <button onClick={() => runReview(s.submission_id, "dismiss")} disabled={busy !== null}>
@@ -450,7 +470,7 @@ function ResultCard({
         <div className="review-box">
           <input value={note} onChange={(e) => onNote(e.target.value)} placeholder="Ghi chú cho người duyệt (không bắt buộc)" maxLength={1000} />
           <div className="toolbar">
-            {result.status === "duplicate_candidate" && (
+            {result.matches.length > 0 && (
               <button className="danger-button" onClick={() => onReview("confirm_duplicate")} disabled={busy !== null}>
                 {busy === "confirm_duplicate" ? <Loader2 className="spin" size={14} /> : <Copy size={14} />} Xác nhận trùng
               </button>
@@ -480,7 +500,7 @@ function CompareTable({ match, current }: { match: MatchOut; current: ExpenseExt
   ];
   return (
     <div className="compare">
-      <p>Trùng <strong>{match.matched_by.map((k) => KEY_LABEL[k]).join(" và ")}</strong> với <strong>{match.submission_id}</strong></p>
+      {matchTitle(match)}
       <table className="compare-table">
         <colgroup><col className="label" /><col className="value" /><col className="value" /><col className="note" /></colgroup>
         <thead><tr><th>Ô</th><th>{current.submission_id} (đang kiểm tra)</th><th>{match.submission_id} (đã gửi trước)</th><th /></tr></thead>
@@ -488,18 +508,27 @@ function CompareTable({ match, current }: { match: MatchOut; current: ExpenseExt
           {rows.map(([field, label, a, b]) => {
             const d = diff[field];
             const soft = d?.note === "chỉ khác chữ hoa/dấu cách";
+            const similar = d?.note.startsWith("gần giống");
             return (
-              <tr key={field} className={clsx(d && (soft ? "soft" : "diff"))}>
+              <tr key={field} className={clsx(d && (soft ? "soft" : similar ? "similar" : "diff"))}>
                 <td>{label}</td>
-                <td className="mono">{show(a)}</td>
-                <td className="mono">{show(b)}</td>
-                <td className="note">{d?.note || (d ? "khác" : "giống")}</td>
+                <td className="mono">{similar ? markDiff(a, b) : show(a)}</td>
+                <td className="mono">{similar ? markDiff(b, a) : show(b)}</td>
+                <td className="note">{similar ? d.note.replace("gần giống, có thể OCR đọc nhầm", "gần giống") : d?.note || (d ? "khác" : "giống")}</td>
               </tr>
             );
           })}
         </tbody>
       </table>
     </div>
+  );
+}
+
+/** Mã gần giống: tô các ký tự khác nhau (vd O và 0), vì nhìn bằng mắt rất khó thấy. */
+function markDiff(value: string | null, other: string | null) {
+  if (value === null || other === null || value.length !== other.length) return show(value);
+  return (
+    <>“{[...value].map((ch, i) => (ch.toLowerCase() === other[i].toLowerCase() ? ch : <mark key={i} className="ocr-char">{ch}</mark>))}”</>
   );
 }
 

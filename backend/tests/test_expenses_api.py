@@ -153,6 +153,34 @@ def test_inv0042_is_not_inv_0042_without_same_receipt(client):
     assert submit(client, 6)["status"] == "unique_under_current_rules"
 
 
+# --- Mã gần giống do OCR đọc nhầm (phần làm thêm) ---------------------------
+
+def test_ocr_similar_invoice_needs_review(client):
+    submit(client, 1)
+    result = submit(client, 11)  # INV-0O42
+    assert (result["status"], result["review_status"]) == ("needs_review", "pending")
+    match = result["matches"][0]
+    assert (match["submission_id"], match["matched_by"]) == ("E01", ["invoice_similar"])
+    diff = next(d for d in match["differences"] if d["field"] == "invoice_number")
+    assert (diff["current"], diff["previous"], diff["note"]) == ("INV-0O42", "INV-0042", "gần giống, có thể OCR đọc nhầm O/0")
+    assert match["previous"]["invoice_number"] == "INV-0042"
+
+
+def test_reviewer_decides_on_similar_invoice(client):
+    submit(client, 1)
+    sid = submit(client, 11)["submission_id"]
+    response = review(client, sid, "confirm_duplicate", note="cùng hóa đơn, OCR đọc nhầm")
+    assert (response.status_code, response.json()["submission"]["review_status"]) == (200, "confirmed_duplicate")
+
+
+def test_fixing_ocr_typo_turns_similar_into_duplicate(client):
+    submit(client, 1)
+    sid = submit(client, 11)["submission_id"]
+    expense = edited(sid, receipt_id=None, missing_fields=["receipt_id"])  # sửa INV-0O42 thành INV-0042
+    response = review(client, sid, "recheck", expense=expense)
+    assert response.json()["result"]["status"] == "duplicate_candidate"
+
+
 # --- Dữ liệu chưa đủ tin cậy: không trả "chưa trùng" (Tự kiểm tra 3) ---------
 
 def test_missing_codes_needs_review_not_unique(client):

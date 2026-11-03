@@ -230,7 +230,7 @@ export interface FieldDiffOut {
 
 export interface MatchOut {
   submission_id: string;
-  matched_by: ("receipt" | "invoice")[];
+  matched_by: ("receipt" | "invoice" | "receipt_similar" | "invoice_similar")[];
   differences: FieldDiffOut[];
   previous: SubmissionOut;
 }

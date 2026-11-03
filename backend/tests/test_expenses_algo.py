@@ -22,6 +22,8 @@ from app.modules.expenses.algo import (
     format_amount,
     lookup_keys,
     normalize_text,
+    ocr_fold,
+    similar_keys,
 )
 
 DAY = date(2026, 10, 19)
@@ -232,6 +234,80 @@ def test_adding_same_submission_twice_is_rejected():
         index.add(exp("E01", receipt="R-99"))
 
 
+# --- Mã gần giống do OCR đọc nhầm (phần làm thêm) ---------------------------
+
+def test_ocr_fold():
+    assert ocr_fold("INV-0O42") == ocr_fold("inv-0042") == "1nv-0042"
+    assert ocr_fold("R-4Z") == ocr_fold("R-42")
+    assert ocr_fold("SB-1l|") == ocr_fold("58-111")
+    assert ocr_fold("INV0042") != ocr_fold("INV-0042")  # vẫn giữ dấu gạch nối
+    assert ocr_fold("  ") is None and ocr_fold(None) is None
+
+
+def test_similar_invoice_only_needs_review():
+    results = run_all([exp("E01", receipt=None), exp("E02", invoice="INV-0O42", receipt=None)])
+    r = results["E02"]
+    assert r.status == NEEDS_REVIEW  # không bao giờ là "ứng viên trùng" khi chỉ gần giống
+    assert [(m.submission_id, m.matched_by) for m in r.matches] == [("E01", ["invoice_similar"])]
+    note = next(d.note for d in r.matches[0].differences if d.field == "invoice_number")
+    assert note == "gần giống, có thể OCR đọc nhầm O/0"
+    assert "Số hóa đơn gần giống E01" in r.reason and "chưa gọi là trùng" in r.reason
+
+
+def test_similar_receipt_only_needs_review():
+    results = run_all([exp("E01", invoice="INV-1"), exp("E02", invoice="INV-2", receipt="R-4Z")])
+    assert results["E02"].status == NEEDS_REVIEW
+    assert results["E02"].matches[0].matched_by == ["receipt_similar"]
+    assert "Z/2" in results["E02"].reason
+
+
+def test_exact_match_stays_duplicate_and_lists_similar_field():
+    results = run_all([exp("E01"), exp("E02", receipt="R-4Z")])  # trùng số hóa đơn, mã biên nhận gần giống
+    r = results["E02"]
+    assert r.status == DUPLICATE
+    assert r.matches[0].matched_by == ["invoice", "receipt_similar"]
+    assert "mã biên nhận gần giống" in r.reason
+
+
+def test_exact_code_is_not_also_reported_as_similar():
+    results = run_all([exp("E01"), exp("E02")])
+    assert results["E02"].matches[0].matched_by == ["receipt", "invoice"]
+
+
+def test_similar_needs_same_vendor_and_currency():
+    results = run_all([
+        exp("E01", receipt=None),
+        exp("E02", vendor="Xanh SM", invoice="INV-0O42", receipt=None),
+        exp("E03", invoice="INV-0O42", receipt=None, currency="USD", amount=100),
+    ])
+    assert results["E02"].status == UNIQUE
+    assert results["E03"].status == UNIQUE
+
+
+def test_vendor_is_not_ocr_folded():
+    # Tên nơi bán không phải mã: "B0B0" và "BOBO" vẫn là 2 nơi bán khác nhau
+    results = run_all([exp("E01", vendor="BOBO", receipt=None), exp("E02", vendor="B0B0", invoice="INV-0O42", receipt=None)])
+    assert results["E02"].status == UNIQUE
+
+
+def test_hyphen_difference_is_not_similar():
+    results = run_all([exp("E01", receipt=None), exp("E02", invoice="INV0042", receipt=None)])
+    assert results["E02"].status == UNIQUE
+
+
+def test_really_different_code_is_not_similar():
+    results = run_all([exp("E01", receipt=None), exp("E02", invoice="INV-0043", receipt=None)])
+    assert results["E02"].status == UNIQUE
+
+
+def test_recheck_removes_similar_keys():
+    index = ExpenseIndex()
+    index.add(exp("E01", receipt="R-4Z", invoice="INV-1"))
+    index.remove("E01")
+    index.add(exp("E01", receipt="R-77", invoice="INV-1"))
+    assert index.check(exp("E02", receipt="R-42", invoice="INV-2")).status == UNIQUE
+
+
 # --- Đối chiếu brute force và tốc độ ----------------------------------------
 
 def brute_force(expenses: list[Expense]) -> dict[str, tuple[str, list[str]]]:
@@ -242,8 +318,12 @@ def brute_force(expenses: list[Expense]) -> dict[str, tuple[str, list[str]]]:
         if not keys:
             out[current.submission_id] = (NEEDS_REVIEW, [])
             continue
-        olds = [e.submission_id for e in expenses[:i] if keys & set(lookup_keys(e))]
-        out[current.submission_id] = (DUPLICATE if olds else UNIQUE, olds)
+        similar = set(similar_keys(current))
+        exact_ids = {e.submission_id for e in expenses[:i] if keys & set(lookup_keys(e))}
+        similar_ids = {e.submission_id for e in expenses[:i] if similar & set(similar_keys(e))}
+        olds = [e.submission_id for e in expenses[:i] if e.submission_id in exact_ids | similar_ids]
+        status = DUPLICATE if exact_ids else NEEDS_REVIEW if similar_ids else UNIQUE
+        out[current.submission_id] = (status, olds)
     return out
 
 
@@ -251,8 +331,8 @@ def brute_force(expenses: list[Expense]) -> dict[str, tuple[str, list[str]]]:
 def test_matches_brute_force_on_random_data(seed):
     rng = random.Random(seed)
     vendors = ["ABC Travel", "abc  travel", "Xanh SM", None]
-    invoices = ["INV-0042", "inv-0042", "INV0042", "INV-7", None]
-    receipts = ["R-42", "r-42", "R-43", None]
+    invoices = ["INV-0042", "inv-0042", "INV0042", "INV-0O42", "INV-7", None]
+    receipts = ["R-42", "r-42", "R-4Z", "R-43", None]
     expenses = [
         exp(f"E{i:03d}", rng.choice(vendors), rng.choice(invoices), rng.choice(receipts),
             rng.randrange(0, 10**7), rng.choice(["VND", "USD", None]))

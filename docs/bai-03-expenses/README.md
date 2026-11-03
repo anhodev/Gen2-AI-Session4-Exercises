@@ -96,19 +96,31 @@ Mẫu không cho phép ô lạ (`additionalProperties: false`). Vì vậy GenAI 
 - Nhãn là **tuple**, không phải chuỗi nối bằng dấu `|`. Nhờ vậy tên nơi bán có chứa `|` cũng không làm hai nhãn khác nhau trông giống nhau.
 - Thiếu loại tiền thì không tạo nhãn nào, vì cùng mã nhưng khác loại tiền là hai chứng từ khác nhau.
 
-**3. Hash map** (`ExpenseIndex`): `nhãn → danh sách mã chứng từ đã có nhãn đó`, giữ theo thứ tự đã thêm.
+**3. Nhãn gần giống** (`similar_keys`, phần làm thêm): mỗi nhãn ở trên có thêm 1 bản mà mã đã được gộp các ký tự OCR hay đọc nhầm (`ocr_fold`).
 
-**4. Kết quả:**
+| Ký tự | `o` | `i`, `l`, `\|` | `z` | `s` | `b` | `g` |
+|---|---|---|---|---|---|---|
+| Gộp thành | `0` | `1` | `2` | `5` | `8` | `6` |
+
+- Ví dụ `INV-0O42` và `INV-0042` đều thành `1nv-0042`. `R-4Z` và `R-42` đều thành `r-42`.
+- Chỉ thay từng ký tự, không xóa ký tự nào: `INV0042` và `INV-0042` vẫn khác nhau.
+- Nơi bán và loại tiền vẫn phải giống hệt (sau chuẩn hóa). Tên nơi bán không phải mã nên không gộp ký tự.
+- Mã khớp chính xác thì không báo thêm là "gần giống".
+
+**4. Hash map** (`ExpenseIndex`): `nhãn → danh sách mã chứng từ đã có nhãn đó`, giữ theo thứ tự đã thêm. Nhãn gần giống nằm chung hash map, nên tra vẫn O(1).
+
+**5. Kết quả:**
 
 | Trạng thái | Khi nào | Kèm theo |
 |---|---|---|
-| `duplicate_candidate` | Có ít nhất một nhãn đã gặp | Các chứng từ cũ (bản gửi sớm nhất đứng đầu), trùng theo nhãn nào, các ô khác nhau và chênh lệch số tiền |
+| `duplicate_candidate` | Có ít nhất một nhãn **chính xác** đã gặp | Các chứng từ cũ (bản gửi sớm nhất đứng đầu), trùng theo nhãn nào, các ô khác nhau và chênh lệch số tiền |
 | `needs_review` | Không tạo được nhãn nào | Lý do. **Chỉ cùng nơi bán, số tiền và ngày chưa đủ để gọi là trùng** |
+| `needs_review` | Không trùng chính xác, nhưng có mã **gần giống** chứng từ cũ | Chứng từ cũ, các ô khác nhau, cặp ký tự có thể bị đọc nhầm (vd "O/0"). Không gọi là trùng, vì hai hóa đơn khác nhau có thể có mã rất giống nhau |
 | `unique_under_current_rules` | Có nhãn nhưng chưa gặp | Lý do ghi rõ "không phải kết luận chứng từ chắc chắn hợp lệ" |
 
 | Thao tác | Độ phức tạp |
 |---|---|
-| Tạo nhãn, tra, thêm một chứng từ | O(1) trung bình (tối đa 2 nhãn) |
+| Tạo nhãn, tra, thêm một chứng từ | O(1) trung bình (tối đa 2 nhãn chính xác + 2 nhãn gần giống) |
 | Kiểm tra n chứng từ | O(n) trung bình. 10.000 chứng từ chạy dưới 1 giây |
 
 Nếu so từng cặp thì phải mất O(n²). Test đối chiếu kết quả hash map với cách so từng cặp (brute force) trên 20 bộ dữ liệu ngẫu nhiên.
@@ -125,13 +137,15 @@ Chính thuật toán cũng chặn tiền âm và loại tiền chưa hỗ trợ 
 
 Nếu E02 có số tiền khác (mẫu 4: 1.350.000), app vẫn đánh dấu trùng vì mã biên nhận trùng, kèm ghi chú "chênh +100.000 VND".
 
+Mẫu 11 gửi sau E01: OCR đọc `INV-0042` thành `INV-0O42` và mất trang biên nhận. Kết quả là `needs_review`, kèm lý do "Số hóa đơn gần giống E01 (có thể OCR đọc nhầm O/0)".
+
 ## 4. Người duyệt
 
 Kết quả `duplicate_candidate` và `needs_review` chuyển sang trạng thái **chờ duyệt** (`pending`). Người duyệt có 3 thao tác qua `POST /expenses/review`:
 
 | Thao tác | Khi nào dùng | Kết quả |
 |---|---|---|
-| `confirm_duplicate` | Chỉ khi có bản trùng | `confirmed_duplicate`. Chỉ ghi nhận ý kiến người duyệt, **không** tự từ chối hoàn tiền |
+| `confirm_duplicate` | Chỉ khi có chứng từ cũ để so (trùng hoặc gần giống) | `confirmed_duplicate`. Chỉ ghi nhận ý kiến người duyệt, **không** tự từ chối hoàn tiền |
 | `dismiss` | Bỏ nghi vấn, hoặc "đã xem lại" với `needs_review` | `dismissed`. **Không xóa nhãn**, nên bản gửi lần 3 vẫn tìm ra cả hai bản trước |
 | `recheck` | Đã sửa thông tin (ví dụ mã biên nhận) | Bỏ bản cũ khỏi bảng tra cứu, kiểm tra lại bản mới trên dữ liệu mới nhất |
 
@@ -141,7 +155,7 @@ Kết quả `duplicate_candidate` và `needs_review` chuyển sang trạng thái
 
 ## 5. Đầu vào: văn bản và PDF
 
-- **Văn bản đã OCR:** dán vào ô nhập, hoặc chọn một trong 10 chứng từ mẫu.
+- **Văn bản đã OCR:** dán vào ô nhập, hoặc chọn một trong 11 chứng từ mẫu.
 - **PDF có sẵn lớp chữ** (PDF xuất từ phần mềm, hoặc đã OCR): `POST /expenses/pdf-text` lấy chữ bằng `pypdf` ([`pdf.py`](../../backend/app/modules/expenses/pdf.py)). Văn bản hiện trong ô nhập để người dùng đọc lại, **rồi mới** gửi cho GenAI.
 - Báo lỗi rõ ràng khi: file không phải PDF, PDF hỏng, có mật khẩu, lớn hơn 5 MB, hơn 10 trang, hoặc **không có lớp chữ** (ảnh scan: app nhắc OCR trước rồi dán văn bản, không đoán).
 - PDF mẫu [`samples/expenses/sunrise-hotel.pdf`](../../backend/samples/expenses/sunrise-hotel.pdf) có cùng nội dung với mẫu 7, nên chạy được ở chế độ mock (nút "Thử PDF mẫu").
@@ -192,11 +206,11 @@ Chạy `cd backend && myenv/bin/python -m pytest -q`. Thuật toán được tes
 
 | File | Số test | Nội dung |
 |---|---|---|
-| [`test_expenses_algo.py`](../../backend/tests/test_expenses_algo.py) | 51 | Thuật toán thuần: chuẩn hóa, nhãn, hash map, so với brute force trên 20 bộ dữ liệu ngẫu nhiên, 10.000 chứng từ dưới 1 giây |
-| [`test_expenses_validation.py`](../../backend/tests/test_expenses_validation.py) | 51 | Mẫu JSON, kiểm tra 2 lớp, từng chứng từ mẫu |
-| [`test_expenses_extractor.py`](../../backend/tests/test_expenses_extractor.py) | 30 | GenAI (mock), prompt, lấy chữ từ PDF (ảnh scan, có mật khẩu, nhiều trang…) |
-| [`test_expenses_store.py`](../../backend/tests/test_expenses_store.py) | 23 | Database: cấp mã, lưu kết quả, kiểm tra lại, duyệt, commit lỗi, dựng lại sau khi khởi động lại |
-| [`test_expenses_api.py`](../../backend/tests/test_expenses_api.py) | 44 | Toàn bộ API bằng `TestClient`, gồm tải PDF |
+| [`test_expenses_algo.py`](../../backend/tests/test_expenses_algo.py) | 61 | Thuật toán thuần: chuẩn hóa, nhãn, mã gần giống, hash map, so với brute force trên 20 bộ dữ liệu ngẫu nhiên, 10.000 chứng từ dưới 1 giây |
+| [`test_expenses_validation.py`](../../backend/tests/test_expenses_validation.py) | 52 | Mẫu JSON, kiểm tra 2 lớp, từng chứng từ mẫu |
+| [`test_expenses_extractor.py`](../../backend/tests/test_expenses_extractor.py) | 31 | GenAI (mock), prompt, lấy chữ từ PDF (ảnh scan, có mật khẩu, nhiều trang…) |
+| [`test_expenses_store.py`](../../backend/tests/test_expenses_store.py) | 24 | Database: cấp mã, lưu kết quả, kiểm tra lại, duyệt, commit lỗi, dựng lại sau khi khởi động lại |
+| [`test_expenses_api.py`](../../backend/tests/test_expenses_api.py) | 47 | Toàn bộ API bằng `TestClient`, gồm tải PDF |
 
 ### Đối chiếu phần "Tự kiểm tra" của đề
 
@@ -214,10 +228,13 @@ Chạy `cd backend && myenv/bin/python -m pytest -q`. Thuật toán được tes
 | Nút xác nhận hoặc bỏ nghi vấn | `test_confirm_duplicate`, `test_dismiss_suspicion` |
 | Lưu thông tin trước và sau khi người dùng sửa | `test_run_keeps_before_and_after_user_edit`, `test_recheck_after_editing_receipt_logs_before_and_after` |
 | Sửa mã biên nhận thì kiểm tra trùng lại | `test_editing_receipt_requires_recheck`, `test_recheck_after_editing_receipt`, `test_recheck_can_find_new_duplicate` |
+| Làm thêm: mã gần giống chỉ vào danh sách cần xem lại | `test_similar_invoice_only_needs_review`, `test_similar_receipt_only_needs_review`, `test_ocr_similar_invoice_needs_review` |
+| Làm thêm: không gộp nhầm | `test_hyphen_difference_is_not_similar`, `test_similar_needs_same_vendor_and_currency`, `test_vendor_is_not_ocr_folded`, `test_really_different_code_is_not_similar` |
+| Làm thêm: người duyệt quyết định, sửa lỗi OCR thì thành trùng | `test_reviewer_decides_on_similar_invoice`, `test_fixing_ocr_typo_turns_similar_into_duplicate` |
 
 ## 9. Dữ liệu mẫu (chế độ mock)
 
-[`samples/expenses.json`](../../backend/samples/expenses.json) có 10 chứng từ. Văn bản được viết giống kết quả OCR thật. Mẫu dùng `"{submission_id}"` để chế độ mock tự điền mã do backend vừa cấp.
+[`samples/expenses.json`](../../backend/samples/expenses.json) có 11 chứng từ. Văn bản được viết giống kết quả OCR thật. Mẫu dùng `"{submission_id}"` để chế độ mock tự điền mã do backend vừa cấp.
 
 | Mẫu | Mục đích |
 |---|---|
@@ -229,6 +246,7 @@ Chạy `cd backend && myenv/bin/python -m pytest -q`. Thuật toán được tes
 | 8 | [Lỗi] GenAI đọc nhầm dòng hoàn tiền thành tổng tiền: tiền âm, bị chặn |
 | 9 | [Lỗi] Chứng từ EUR: GenAI ghi đúng EUR, code báo chưa hỗ trợ |
 | 10 | [Lỗi] GenAI lấy số hóa đơn làm `submission_id`: đúng khuôn nhưng sai nội dung |
+| 11 | OCR đọc `INV-0042` thành `INV-0O42`, không có biên nhận: gần giống E01, cần người xem lại |
 
 ## 10. Ảnh chụp luồng chính
 
@@ -248,11 +266,15 @@ Chạy `cd backend && myenv/bin/python -m pytest -q`. Thuật toán được tes
 
 ![Danh sách đã kiểm tra](images/03-danh-sach.jpg)
 
+**Số hóa đơn gần giống (mẫu 11 sau E01):** kết quả "Cần người xem lại", không phải "ứng viên trùng". Bảng so cặp tô xanh dòng số hóa đơn và **tô đậm ký tự khác nhau**, vì `O` và `0` nhìn bằng mắt rất khó phân biệt. Người duyệt vẫn có nút xác nhận trùng nếu thấy đúng là cùng hóa đơn.
+
+![Số hóa đơn gần giống](images/04-ma-gan-giong.jpg)
+
 ## 11. Giới hạn và các quyết định
 
 - **Chỉ chạy 1 worker.** Hash map nằm trong bộ nhớ của tiến trình, giống hàng đợi Bài 01. Một `threading.Lock` bảo đảm hai request không sửa hash map cùng lúc.
 - **Ảnh chụp (JPG, PNG) chưa hỗ trợ.** Chỉ nhận văn bản đã OCR hoặc PDF có lớp chữ. PDF chỉ có ảnh scan sẽ bị báo lỗi để người dùng OCR trước.
 - **Chỉ hỗ trợ VND và USD**, không quy đổi tỷ giá. Chứng từ loại tiền khác bị chặn cho tới khi người dùng tự quy đổi và sửa tay.
-- **Chưa tìm số hóa đơn gần giống** do OCR đọc sai (ví dụ `0` và `O`). Phần này để làm thêm.
+- **Mã gần giống chỉ bắt lỗi đọc nhầm từng ký tự** theo bảng ở mục 3. OCR làm thiếu hoặc thừa ký tự (`INV-042`), hay đọc nhầm cặp ký tự ngoài bảng, thì không tìm ra. Muốn bắt cả các lỗi này phải so khoảng cách chỉnh sửa (edit distance) với từng mã cũ, mất O(n) cho mỗi lần tra thay vì O(1).
 - **Sửa chứng từ cũ không cập nhật kết luận của các chứng từ đã kiểm tra trước đó.** Ví dụ E02 từng được đánh dấu trùng E01, sau đó E01 được sửa mã biên nhận: `matched_ids` của E02 vẫn giữ E01. Muốn cập nhật thì kiểm tra lại E02.
 - **Chế độ mock chỉ đọc được chứng từ có trong `samples/`.** Văn bản khác sẽ báo lỗi rõ ràng, không bịa kết quả.

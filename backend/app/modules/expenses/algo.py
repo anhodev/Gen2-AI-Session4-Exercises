@@ -7,9 +7,13 @@
       2. loại tiền + nơi bán + số hóa đơn (tìm được bản gửi sau bị thiếu mã biên nhận)
   - Hash map: nhãn -> các chứng từ cũ có nhãn đó. Tra một nhãn O(1) trung bình,
       n chứng từ khoảng O(n).
+  - Mỗi nhãn có thêm 1 bản "gần giống": gộp các ký tự OCR hay đọc nhầm (O/0, I/l/1, Z/2, S/5, B/8, G/6).
+      Hai mã khác nhau nhưng gộp ra giống nhau (INV-0O42 và INV-0042) chỉ được đưa vào
+      danh sách cần xem lại, vì hai hóa đơn khác nhau có thể trông rất giống nhau.
   - Kết quả:
       duplicate_candidate         có nhãn đã gặp: cho biết chứng từ cũ và các ô khác nhau
-      needs_review                không tạo được nhãn nào (thiếu mã, thiếu loại tiền)
+      needs_review                không tạo được nhãn nào (thiếu mã, thiếu loại tiền),
+                                  hoặc chỉ có mã gần giống chứng từ cũ
       unique_under_current_rules  chưa thấy nhãn này. KHÔNG có nghĩa là chắc chắn hợp lệ.
   - Hệ thống chỉ giúp người duyệt kiểm tra, không tự kết luận gian lận hay từ chối hoàn tiền.
 """
@@ -30,7 +34,16 @@ NEEDS_REVIEW = "needs_review"
 UNIQUE = "unique_under_current_rules"
 
 # Tên nhãn, dùng trong lý do hiển thị cho người duyệt
-KEY_LABELS = {"receipt": "mã biên nhận", "invoice": "nơi bán + số hóa đơn"}
+KEY_LABELS = {
+    "receipt": "mã biên nhận",
+    "invoice": "nơi bán + số hóa đơn",
+    "receipt_similar": "mã biên nhận",
+    "invoice_similar": "số hóa đơn",
+}
+
+# Ký tự OCR hay đọc nhầm -> ký tự đại diện (áp dụng sau khi đã chuyển chữ thường).
+# Chỉ thay từng ký tự, không xóa ký tự nào: INV-0042 và INV0042 vẫn khác nhau.
+OCR_CONFUSABLE = str.maketrans({"o": "0", "i": "1", "l": "1", "|": "1", "z": "2", "s": "5", "b": "8", "g": "6"})
 
 
 # Lỗi: mỗi loại một class để API trả thông báo rõ ràng
@@ -141,13 +154,49 @@ def lookup_keys(expense: Expense) -> list[tuple]:
     return keys
 
 
+def ocr_fold(value: str | None) -> str | None:
+    """
+    Gộp các ký tự OCR hay đọc nhầm, vd "INV-0O42" và "inv-0042" cùng thành "1nv-0042".
+
+    Returns:
+        str | None: Chuỗi đã chuẩn hóa và gộp, None nếu rỗng.
+    """
+    text = normalize_text(value)
+    return text.translate(OCR_CONFUSABLE) if text else None
+
+
+def similar_keys(expense: Expense) -> list[tuple]:
+    """
+    Nhãn "gần giống" của chứng từ: giống lookup_keys nhưng mã đã qua ocr_fold.
+    Nơi bán vẫn phải giống hệt sau chuẩn hóa (tên không phải mã, không gộp ký tự).
+
+    Returns:
+        list[tuple]: vd ("receipt_similar", "VND", "r-42"), ("invoice_similar", "VND", "abc travel", "1nv-0042").
+    """
+    if expense.currency is None:
+        return []
+    keys = []
+    receipt = ocr_fold(expense.receipt_id)
+    if receipt:
+        keys.append(("receipt_similar", expense.currency, receipt))
+    vendor, invoice = normalize_text(expense.vendor), ocr_fold(expense.invoice_number)
+    if vendor and invoice:
+        keys.append(("invoice_similar", expense.currency, vendor, invoice))
+    return keys
+
+
+def all_keys(expense: Expense) -> list[tuple]:
+    """Nhãn chính xác + nhãn gần giống, là những gì bảng tra cứu lưu."""
+    return lookup_keys(expense) + similar_keys(expense)
+
+
 # --- Bảng tra cứu (hash map) ------------------------------------------------
 
 class ExpenseIndex:
     """
     Bảng tra cứu chứng từ đã gửi: nhãn -> danh sách mã chứng từ (theo thứ tự đã thêm).
 
-    Thêm, xóa, tra một chứng từ: O(1) trung bình (mỗi chứng từ có tối đa 2 nhãn).
+    Thêm, xóa, tra một chứng từ: O(1) trung bình (mỗi chứng từ có tối đa 4 nhãn).
     """
 
     def __init__(self) -> None:
@@ -177,7 +226,7 @@ class ExpenseIndex:
         self._expenses[expense.submission_id] = expense
         self._counter += 1
         self._order[expense.submission_id] = self._counter
-        for key in lookup_keys(expense):
+        for key in all_keys(expense):
             self._by_key[key].append(expense.submission_id)
 
     def remove(self, submission_id: str) -> Expense | None:
@@ -186,7 +235,7 @@ class ExpenseIndex:
         if expense is None:
             return None
         del self._order[submission_id]
-        for key in lookup_keys(expense):
+        for key in all_keys(expense):
             ids = self._by_key[key]
             ids.remove(submission_id)
             if not ids:
@@ -214,6 +263,13 @@ class ExpenseIndex:
                 if old_id != expense.submission_id:
                     matched_by.setdefault(old_id, []).append(key[0])
 
+        # Nhãn gần giống: chỉ tính khi mã đó chưa trùng chính xác với cùng chứng từ cũ
+        for key in similar_keys(expense):
+            exact = key[0].removesuffix("_similar")
+            for old_id in self._by_key.get(key, []):
+                if old_id != expense.submission_id and exact not in matched_by.get(old_id, []):
+                    matched_by.setdefault(old_id, []).append(key[0])
+
         if not matched_by:
             labels = ", ".join(KEY_LABELS[k[0]] for k in keys)
             return CheckResult(
@@ -227,7 +283,10 @@ class ExpenseIndex:
             Match(old_id, matched_by[old_id], compare(expense, self._expenses[old_id]))
             for old_id in sorted(matched_by, key=self._order.__getitem__)
         ]
-        return CheckResult(DUPLICATE, keys, matches, explain_duplicate(expense, matches))
+        if any(is_exact(m) for m in matches):
+            return CheckResult(DUPLICATE, keys, matches, explain_duplicate(expense, matches))
+        # Chỉ gần giống: không đủ để gọi là trùng
+        return CheckResult(NEEDS_REVIEW, keys, matches, explain_similar(matches))
 
     def check_and_add(self, expense: Expense) -> CheckResult:
         """Kiểm tra rồi thêm vào bảng (dùng khi lưu chứng từ mới)."""
@@ -237,6 +296,24 @@ class ExpenseIndex:
 
 
 # --- So sánh và lý do -------------------------------------------------------
+
+def is_exact(match: Match) -> bool:
+    """Chứng từ cũ có ít nhất một nhãn trùng chính xác (không chỉ gần giống)."""
+    return any(not k.endswith("_similar") for k in match.matched_by)
+
+
+def ocr_pairs(a: str, b: str) -> list[str]:
+    """
+    Các cặp ký tự khác nhau giữa 2 mã gần giống, vd ("INV-0O42", "INV-0042") -> ["O/0"].
+    Hai mã cùng độ dài sau chuẩn hóa vì ocr_fold chỉ thay từng ký tự.
+    """
+    na, nb = " ".join(unicodedata.normalize("NFKC", a).split()), " ".join(unicodedata.normalize("NFKC", b).split())
+    pairs = []
+    for x, y in zip(na, nb):
+        if x.casefold() != y.casefold() and f"{x}/{y}" not in pairs:
+            pairs.append(f"{x}/{y}")
+    return pairs
+
 
 def format_amount(amount_minor: int | None, currency: str | None) -> str | None:
     """
@@ -264,8 +341,13 @@ def compare(current: Expense, previous: Expense) -> list[FieldDiff]:
         a, b = getattr(current, name), getattr(previous, name)
         if a == b:
             continue
-        same = a is not None and b is not None and normalize_text(a) == normalize_text(b)
-        diffs.append(FieldDiff(name, a, b, "chỉ khác chữ hoa/dấu cách" if same else ""))
+        note = ""
+        if a is not None and b is not None:
+            if normalize_text(a) == normalize_text(b):
+                note = "chỉ khác chữ hoa/dấu cách"
+            elif name != "vendor" and ocr_fold(a) == ocr_fold(b):
+                note = f"gần giống, có thể OCR đọc nhầm {', '.join(ocr_pairs(a, b))}"
+        diffs.append(FieldDiff(name, a, b, note))
 
     if current.transaction_date != previous.transaction_date:
         diffs.append(FieldDiff(
@@ -306,14 +388,37 @@ def explain_duplicate(expense: Expense, matches: list[Match]) -> str:
     """Lý do đánh dấu ứng viên trùng, ví dụ "Trùng mã biên nhận với E01; số tiền chênh +100.000 VND"."""
     parts = []
     for match in matches:
-        labels = " và ".join(KEY_LABELS[k] for k in match.matched_by)
-        text = f"trùng {labels} với {match.submission_id}"
+        exact = [KEY_LABELS[k] for k in match.matched_by if not k.endswith("_similar")]
+        similar = [KEY_LABELS[k] for k in match.matched_by if k.endswith("_similar")]
+        if exact:
+            text = f"trùng {' và '.join(exact)} với {match.submission_id}"
+            if similar:
+                text += f", {' và '.join(similar)} gần giống"
+        else:
+            text = f"{' và '.join(similar)} gần giống {match.submission_id}"
         amount = next((d for d in match.differences if d.field == "amount_minor" and d.note), None)
         if amount:
             text += f" (số tiền {amount.note})"
         parts.append(text)
     text = "; ".join(parts)
     return text[0].upper() + text[1:] + ". Người duyệt cần xác nhận hoặc bỏ nghi vấn."
+
+
+def explain_similar(matches: list[Match]) -> str:
+    """Lý do khi chỉ có mã gần giống: đưa vào danh sách cần xem lại, không gọi là trùng."""
+    parts = []
+    for match in matches:
+        labels = " và ".join(KEY_LABELS[k] for k in match.matched_by)
+        pairs = [d.note.split("đọc nhầm ")[-1] for d in match.differences if d.note.startswith("gần giống")]
+        text = f"{labels} gần giống {match.submission_id}"
+        if pairs:
+            text += f" (có thể OCR đọc nhầm {', '.join(pairs)})"
+        parts.append(text)
+    text = "; ".join(parts)
+    return (
+        text[0].upper() + text[1:] + ". Hai hóa đơn khác nhau có thể có mã rất giống nhau, "
+        "nên chưa gọi là trùng: cần người xem lại."
+    )
 
 
 def from_extraction(data) -> Expense:

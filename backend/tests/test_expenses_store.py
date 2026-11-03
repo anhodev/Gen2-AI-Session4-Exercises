@@ -205,6 +205,15 @@ def test_confirm_duplicate(db):
     assert (log.action, log.note, log.before == log.after) == ("confirm_duplicate", "cùng vé máy bay", True)
 
 
+def test_confirm_duplicate_on_similar_code(db):
+    # Chỉ gần giống (needs_review) nhưng có chứng từ cũ để so: người duyệt vẫn xác nhận trùng được
+    index = ExpenseIndex()
+    submit(db, index, receipt_id=None, missing_fields=["receipt_id"])
+    sid, result = submit(db, index, invoice_number="INV-0O42", receipt_id=None, missing_fields=["receipt_id"])
+    assert (result.status, get_submission(db, sid).matched_ids) == (NEEDS_REVIEW, ["E01"])
+    assert review(db, sid, "confirm_duplicate").review_status == "confirmed_duplicate"
+
+
 def test_dismiss_needs_review(db):
     index = ExpenseIndex()
     sid, _ = submit(db, index, invoice_number=None, receipt_id=None, missing_fields=["invoice_number", "receipt_id"])
