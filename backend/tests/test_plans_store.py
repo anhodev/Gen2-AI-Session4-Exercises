@@ -8,7 +8,7 @@ from app.core.runs import create_run
 from app.modules.plans.algo import topological_order
 from app.modules.plans.entities import PlanOrder
 from app.modules.plans.schemas import DependencyIn, PlanOut, TaskIn
-from app.modules.plans.store import first_plan, list_orders, result_payload, save_order
+from app.modules.plans.store import OrderConflictError, first_plan, list_orders, result_payload, save_order
 
 SAMPLE = load_samples("plans")[0]  # ví dụ trong đề
 
@@ -77,3 +77,18 @@ def test_first_plan_uses_system_ids(db):
     first = first_plan(new_run(db))
     assert [t["id"] for t in first["tasks"]] == ["T01", "T02", "T03", "T04"]
     assert first_plan(new_run(db, llm_output=None)) == {}  # GenAI lỗi: mọi ô tính là người dùng nhập
+
+
+def test_same_version_saved_twice_is_rejected_and_run_unchanged(db):
+    # Giả lập request khác vừa lưu lần tính 2 trong lúc request này đếm ra 1 lần -> cũng định lưu lần 2
+    run = new_run(db)
+    first = compute(db, run, plan())
+    db.add(PlanOrder(run_id=run.id, version=2, tasks=[], dependencies=[], status="ordered", result={}, warnings=[]))
+    db.commit()
+    db.query(PlanOrder).filter(PlanOrder.id == first.id).delete()
+    db.commit()
+    with pytest.raises(OrderConflictError):
+        compute(db, run, plan(("T02", "T01")))
+    db.refresh(run)
+    assert run.result["order_id"] == first.id  # run giữ kết quả cũ, không ghi nửa chừng
+    assert [r.version for r in list_orders(db, run.id)] == [2]

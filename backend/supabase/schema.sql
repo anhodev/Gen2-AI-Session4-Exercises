@@ -136,7 +136,9 @@ create table if not exists public.plan_orders (
   created_at timestamptz not null default now()
 );
 
-create index if not exists ix_plan_orders_run_id on public.plan_orders (run_id);
+-- Hai request tính cùng lúc cho một biên bản không được cùng số lần tính.
+-- Dùng unique index (không phải constraint trong create table) để chạy lại được trên bảng đã có.
+create unique index if not exists uq_plan_orders_run_version on public.plan_orders (run_id, version);
 create index if not exists ix_plan_orders_status on public.plan_orders (status);
 
 -- Bật Row Level Security: chặn truy cập trực tiếp qua Supabase API bằng anon key.

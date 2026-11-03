@@ -256,3 +256,23 @@ def test_order_saved_before_stages_still_loads(tmp_path):
             db.commit()
         out = c.get(f"/plans/orders/{order_id}").json()
         assert out["stages"] == [] and out["steps"][0]["stage"] is None
+
+
+
+def test_two_orders_at_once_second_gets_409(tmp_path):
+    # Giả lập request khác vừa lưu lần tính 2: request này cũng đếm ra lần 2 và bị database từ chối
+    from app.modules.plans.entities import PlanOrder
+
+    app = create_app(Settings(database_url=f"sqlite:///{tmp_path}/race.db", mock_llm=True))
+    with TestClient(app) as c:
+        data = extract(c, 1)
+        first = order(c, data["run_id"], data["plan"]).json()
+        with app.state.session_factory() as db:
+            db.add(PlanOrder(run_id=data["run_id"], version=2, tasks=[], dependencies=[], status="ordered", result={"reason": "lần tính của request khác"}, warnings=[]))
+            db.query(PlanOrder).filter(PlanOrder.id == first["order_id"]).delete()
+            db.commit()
+        response = order(c, data["run_id"], data["plan"])
+        assert response.status_code == 409
+        assert "tính lại" in response.json()["detail"]
+        assert [h["version"] for h in c.get("/plans/orders").json()] == [2]
+        assert c.get(f"/runs/{data['run_id']}").json()["result"]["order_id"] == first["order_id"]

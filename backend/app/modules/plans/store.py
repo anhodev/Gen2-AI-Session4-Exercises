@@ -8,15 +8,20 @@ Mỗi lần tính ghi 2 nơi trong cùng một commit:
 from __future__ import annotations
 
 from sqlalchemy import func, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.entities import Run, now_utc
 from app.core.runs import mark_confirmed
 
-from .algo import OrderResult, explain_step
+from .algo import OrderResult, PlanError, explain_step
 from .entities import PlanOrder
 from .schemas import Issue, PlanOut
 from .validation import validate_extraction
+
+
+class OrderConflictError(PlanError):
+    """Biên bản vừa được tính ở một request khác cùng lúc (trùng số lần tính)."""
 
 
 def result_payload(plan: PlanOut, result: OrderResult) -> dict:
@@ -66,6 +71,9 @@ def save_order(db: Session, run: Run, plan: PlanOut, result: OrderResult, warnin
 
     Returns:
         PlanOrder: Dòng vừa lưu.
+
+    Raises:
+        OrderConflictError: Một request khác vừa lưu lần tính cùng số. Không lưu gì, run giữ nguyên.
     """
     version = db.scalar(select(func.count()).where(PlanOrder.run_id == run.id)) + 1
     payload = result_payload(plan, result)
@@ -79,17 +87,23 @@ def save_order(db: Session, run: Run, plan: PlanOut, result: OrderResult, warnin
         warnings=[w.model_dump() for w in warnings],
         created_at=now_utc(),
     )
-    db.add(row)
-    db.flush()  # lấy id để ghi vào run
-
-    summary = {"order_id": row.id, "version": version, "status": result.status, "reason": result.reason}
+    summary = {"version": version, "status": result.status, "reason": result.reason}
     if result.order:
         summary["order"] = result.order
         summary["stages"] = result.stages
     else:
         summary["cycle"] = result.cycle
-    mark_confirmed(run, plan.model_dump(), summary, baseline=first_plan(run))
-    db.commit()
+    baseline = first_plan(run)
+
+    try:
+        db.add(row)
+        db.flush()  # lấy id để ghi vào run; trùng số lần tính thì database báo lỗi ngay ở đây
+        mark_confirmed(run, plan.model_dump(), {"order_id": row.id, **summary}, baseline=baseline)
+        db.commit()
+    except IntegrityError as exc:
+        # Lớp database (unique run_id + version) từ chối: bỏ cả dòng mới lẫn thay đổi trên run
+        db.rollback()
+        raise OrderConflictError("Biên bản này vừa được tính ở một request khác. Hãy bấm tính lại.") from exc
     db.refresh(row)
     return row
 

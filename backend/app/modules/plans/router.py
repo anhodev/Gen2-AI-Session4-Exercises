@@ -35,7 +35,7 @@ from .schemas import (
     PlanRequest,
     ValidateOut,
 )
-from .store import get_order, list_orders, save_order
+from .store import OrderConflictError, get_order, list_orders, save_order
 from .validation import has_errors, validate_plan
 
 router = APIRouter(prefix="/plans", tags=["Bài 04 - Plans"])
@@ -103,7 +103,8 @@ def order(payload: PlanRequest, db: Session = Depends(get_db), tz: ZoneInfo = De
     không phải lỗi của request. Khi có vòng KHÔNG trả nửa danh sách thứ tự.
 
     Raises:
-        HTTPException: 404 không thấy lần extract; 400 còn lỗi (mã lạ, việc tự chờ chính nó…).
+        HTTPException: 404 không thấy lần extract; 400 còn lỗi (mã lạ, việc tự chờ chính nó…);
+            409 một request khác vừa tính cùng biên bản này.
 
     Returns:
         OrderOut: Thứ tự kèm lý do từng việc, hoặc vòng chờ nhau kèm câu bằng chứng của từng quan hệ.
@@ -118,7 +119,10 @@ def order(payload: PlanRequest, db: Session = Depends(get_db), tz: ZoneInfo = De
     except PlanError as exc:  # validation đã chặn; giữ lại để dữ liệu sai không bao giờ ra thứ tự
         raise HTTPException(status_code=400, detail=str(exc))
 
-    row = save_order(db, run, plan, result, issues)
+    try:
+        row = save_order(db, run, plan, result, issues)
+    except OrderConflictError as exc:
+        raise HTTPException(status_code=409, detail=str(exc))
     return to_order_out(row, tz)
 
 

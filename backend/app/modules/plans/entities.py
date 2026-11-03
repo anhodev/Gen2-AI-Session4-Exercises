@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from sqlalchemy import JSON, DateTime, ForeignKey, Integer, String
+from sqlalchemy import JSON, DateTime, ForeignKey, Integer, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.database import Base
@@ -17,6 +17,8 @@ from app.core.entities import now_utc
 
 class PlanOrder(Base):
     __tablename__ = "plan_orders"
+    # Hai request tính cùng lúc cho một biên bản có thể cùng đếm ra một số lần tính: database từ chối dòng thứ hai
+    __table_args__ = (UniqueConstraint("run_id", "version", name="uq_plan_orders_run_version"),)
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     run_id: Mapped[int] = mapped_column(ForeignKey("runs.id", ondelete="CASCADE"), index=True)

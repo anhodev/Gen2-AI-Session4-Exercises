@@ -150,7 +150,7 @@ Test đối chiếu kết quả với cách thử mọi hoán vị (brute force)
 |---|---|---|
 | `POST /plans/extract` | Nhận `text`. GenAI đọc, code kiểm tra, cấp mã T01…, lưu lịch sử. Trả `llm_output`, `llm_issues`, `plan`, `issues`, `can_order`, `run_id`. **Chưa** tính thứ tự | 422 biên bản rỗng hoặc quá dài |
 | `POST /plans/validate` | Nhận `run_id` và bản đang sửa. Kiểm tra lại, cấp mã cho việc mới (`id: null`). **Không lưu gì** | 404 không thấy lần extract; 422 sai khuôn |
-| `POST /plans/order` | Nhận `run_id` và bản đã xác nhận. Kiểm tra lại, xếp thứ tự, chia đợt (`stages`, mỗi bước có `stage`), **lưu lần tính này**. Có vòng vẫn trả 200 với `status: "cycle_detected"` | 400 còn lỗi (mã lạ, mã trùng, tự chờ chính nó, mã không do hệ thống cấp), không lưu gì; 404; 422 |
+| `POST /plans/order` | Nhận `run_id` và bản đã xác nhận. Kiểm tra lại, xếp thứ tự, chia đợt (`stages`, mỗi bước có `stage`), **lưu lần tính này**. Có vòng vẫn trả 200 với `status: "cycle_detected"` | 400 còn lỗi (mã lạ, mã trùng, tự chờ chính nó, mã không do hệ thống cấp), không lưu gì; 404; 409 một request khác vừa tính cùng biên bản; 422 |
 | `GET /plans/samples` | Biên bản mẫu cho chế độ mock | |
 | `GET /plans/orders?run_id=&limit=` | Các lần tính, mới nhất trước | |
 | `GET /plans/orders/{order_id}` | Một lần tính, đọc từ database đúng như lúc tính | 404 |
@@ -183,7 +183,8 @@ Lệnh thứ hai thêm T04 → T01 nên trả `cycle_detected`. Thay `run_id` b�
 - Gặp vòng, sửa rồi tính lại: lịch sử có cả lần `cycle_detected` lẫn lần `ordered`, để xem lại vì sao lần đầu không xếp được.
 - `edited_fields` so với bản GenAI **đã đổi sang mã T01…**. Nếu so thẳng với JSON gốc thì mọi ô đều bị tính là đã sửa, vì GenAI dùng mã tạm A, B.
 - Bài này không giữ gì trong bộ nhớ, nên không cần khóa và không cần dựng lại khi khởi động. Mỗi lần tính chỉ ghi vào database.
-- Bảng trên Supabase: [`schema.sql`](../../backend/supabase/schema.sql), có ràng buộc `status in ('ordered','cycle_detected')`.
+- Số lần tính là "số lần đã có + 1". Hai request tính cùng lúc cho một biên bản có thể cùng đếm ra một số, nên database có ràng buộc unique `(run_id, version)`. Request sau bị từ chối với lỗi 409 "hãy bấm tính lại", và cả dòng mới lẫn thay đổi trên `runs` đều được hoàn tác. Cách này giống Bài 02: database là lớp chặn cuối.
+- Bảng trên Supabase: [`schema.sql`](../../backend/supabase/schema.sql), có ràng buộc `status in ('ordered','cycle_detected')` và unique `(run_id, version)`.
 
 ## 6. Giao diện
 
@@ -209,8 +210,8 @@ Chạy `cd backend && myenv/bin/python -m pytest -q`. Thuật toán được tes
 | [`test_plans_algo.py`](../../backend/tests/test_plans_algo.py) | 328 | Thuật toán thuần, chia 3 nhóm theo đề: ca thường, ca sát giới hạn, dữ liệu sai. So với brute force trên 200 đồ thị ngẫu nhiên, 10.000 việc dưới 1 giây, vòng 50.000 việc. Chia đợt: kiểm tra trên 100 đồ thị ngẫu nhiên rằng mũi tên luôn sang đợt sau và mỗi việc ở đợt sớm nhất |
 | [`test_plans_validation.py`](../../backend/tests/test_plans_validation.py) | 57 | Mẫu JSON, kiểm tra 2 lớp, cấp mã, câu bằng chứng, từng biên bản mẫu |
 | [`test_plans_extractor.py`](../../backend/tests/test_plans_extractor.py) | 29 | GenAI (mock và giả lập lỗi model), prompt, schema đổi sang tool OpenAI |
-| [`test_plans_store.py`](../../backend/tests/test_plans_store.py) | 5 | Database: mỗi lần tính một dòng, đánh số lần tính, cập nhật run |
-| [`test_plans_api.py`](../../backend/tests/test_plans_api.py) | 22 | Toàn bộ API bằng `TestClient`, lưu lại sau khi khởi động lại app, đọc được lần tính lưu trước khi có chia đợt |
+| [`test_plans_store.py`](../../backend/tests/test_plans_store.py) | 6 | Database: mỗi lần tính một dòng, đánh số lần tính, cập nhật run, trùng số lần tính thì hoàn tác |
+| [`test_plans_api.py`](../../backend/tests/test_plans_api.py) | 23 | Toàn bộ API bằng `TestClient`, lưu lại sau khi khởi động lại app, đọc được lần tính lưu trước khi có chia đợt, 409 khi hai request tính cùng lúc |
 
 ### Đối chiếu phần "Tự kiểm tra" của đề
 
