@@ -9,14 +9,14 @@ Bài tập Gen2-AI: 4 tình huống doanh nghiệp ghép thành **một ứng d�
 |---|---|---|---|
 | [01](docs/bai-01-tickets/README.md) | Khách hàng nào cần được hỗ trợ trước? | Hàng đợi ưu tiên (min-heap) | ✅ Xong |
 | [02](docs/bai-02-docks/README.md) | Xe giao hàng nên vào cửa kho lúc mấy giờ? | Gộp khoảng thời gian (interval) | ✅ Xong |
-| 03 | Hóa đơn này đã được gửi trước đó chưa? | Tra cứu bằng hash map | Chưa làm |
+| [03](docs/bai-03-expenses/README.md) | Hóa đơn này đã được gửi trước đó chưa? | Tra cứu bằng hash map | ✅ Xong |
 | 04 | Việc nào phải làm trước? | Đồ thị phụ thuộc (topological sort) | Chưa làm |
 
 ## Công nghệ
 
 | Phần | Dùng |
 |---|---|
-| Backend | FastAPI, Pydantic, SQLAlchemy, LangChain `with_structured_output` (OpenAI) |
+| Backend | FastAPI, Pydantic, SQLAlchemy, LangChain `with_structured_output` (OpenAI), `pypdf` (lấy chữ từ PDF, Bài 03) |
 | Database | Supabase PostgreSQL (SQLite khi chạy test hoặc chưa cấu hình) |
 | Frontend | Next.js 16, React 19, Tailwind (khung giao diện lấy từ project buổi 4) |
 | Test | pytest + FastAPI `TestClient` (không gọi GenAI, không cần mạng) |
@@ -26,17 +26,18 @@ Bài tập Gen2-AI: 4 tình huống doanh nghiệp ghép thành **một ứng d�
 ```
 ├── backend/
 │   ├── app/
-│   │   ├── main.py              # create_app + lifespan (dựng lại hàng đợi, seed cửa kho khi khởi động)
+│   │   ├── main.py              # create_app + lifespan (dựng lại hàng đợi, seed cửa kho, dựng lại bảng tra cứu chứng từ)
 │   │   ├── core/                # dùng chung 4 bài: config, database, gọi GenAI, lịch sử xử lý
 │   │   └── modules/
 │   │       ├── tickets/         # Bài 01: schemas, validation, extractor, algo, store, router
-│   │       └── docks/           # Bài 02: cùng cấu trúc, thêm entities (bảng cửa kho, lịch đặt)
-│   ├── samples/                 # tickets.json, docks.json: dữ liệu mẫu cho chế độ mock (không tốn tiền gọi model)
+│   │       ├── docks/           # Bài 02: cùng cấu trúc, thêm entities (bảng cửa kho, lịch đặt)
+│   │       └── expenses/        # Bài 03: cùng cấu trúc, thêm pdf.py (lấy chữ từ PDF)
+│   ├── samples/                 # tickets.json, docks.json, expenses.json (+ PDF mẫu): dữ liệu mẫu cho chế độ mock
 │   ├── supabase/schema.sql      # tạo bảng trên Supabase
 │   └── tests/
 ├── frontend/
 │   ├── app/                     # trang chính + proxy /api -> FastAPI
-│   ├── components/              # TicketWorkspace, DockWorkspace, RunHistory, ui
+│   ├── components/              # TicketWorkspace, DockWorkspace, ExpenseWorkspace, RunHistory, ui
 │   └── lib/                     # api.ts, types.ts
 └── docs/                        # tài liệu, JSON Schema, ảnh chụp từng bài
 ```
@@ -70,7 +71,7 @@ Các giá trị trong `backend/.env`:
 1. Mở SQL Editor và chạy file `backend/supabase/schema.sql`.
 2. Lấy thông tin kết nối ở *Project Settings → Database → Connection parameters*.
 
-Chạy server (chỉ 1 worker, vì hàng đợi Bài 01 nằm trong bộ nhớ):
+Chạy server (chỉ 1 worker, vì hàng đợi Bài 01 và bảng tra cứu Bài 03 nằm trong bộ nhớ):
 
 ```bash
 myenv/bin/uvicorn app.main:app --reload --reload-dir app --port 8000
@@ -95,7 +96,7 @@ cd backend
 myenv/bin/python -m pytest -q
 ```
 
-Hiện có 271 test, chạy trong khoảng 1 giây. Test không gọi GenAI và không cần Supabase (dùng mock và SQLite tạm).
+Hiện có 470 test, chạy trong khoảng 3 giây. Test không gọi GenAI và không cần Supabase (dùng mock và SQLite tạm).
 
 ## Dữ liệu
 

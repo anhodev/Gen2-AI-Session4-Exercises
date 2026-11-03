@@ -1,0 +1,116 @@
+{
+  "additionalProperties": false,
+  "description": "Thông tin GenAI đọc ra từ một chứng từ chi phí (hóa đơn, biên nhận).",
+  "properties": {
+    "submission_id": {
+      "description": "Chép đúng mã chứng từ hệ thống đã cấp. Không tự tạo mã mới.",
+      "title": "Submission Id",
+      "type": "string"
+    },
+    "vendor": {
+      "anyOf": [
+        {
+          "maxLength": 200,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "Tên nơi bán ghi trên chứng từ, giữ nguyên cách viết. null nếu không đọc được.",
+      "title": "Vendor"
+    },
+    "invoice_number": {
+      "anyOf": [
+        {
+          "maxLength": 64,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "Số hóa đơn, chép đúng từng ký tự kể cả dấu gạch nối (INV-0042 khác INV0042). null nếu không đọc được.",
+      "title": "Invoice Number"
+    },
+    "transaction_date": {
+      "anyOf": [
+        {
+          "format": "date",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "Ngày giao dịch trên chứng từ, dạng YYYY-MM-DD. null nếu không đọc được.",
+      "title": "Transaction Date"
+    },
+    "amount_minor": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "Tổng tiền ở đơn vị nhỏ nhất, là số nguyên không âm: VND tính bằng đồng (1.250.000đ -> 1250000), USD tính bằng cent (12,50 USD -> 1250). null nếu không đọc được.",
+      "title": "Amount Minor"
+    },
+    "currency": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "Mã loại tiền ISO 4217 gồm 3 chữ in hoa, ví dụ VND, USD, EUR. Ghi đúng loại tiền trên chứng từ, kể cả khi không phải VND hay USD. 'đ', '₫' là VND; '$' là USD. null nếu không đọc được.",
+      "title": "Currency"
+    },
+    "receipt_id": {
+      "anyOf": [
+        {
+          "maxLength": 64,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "Mã biên nhận (receipt), chép đúng từng ký tự. null nếu chứng từ không có hoặc không đọc được.",
+      "title": "Receipt Id"
+    },
+    "missing_fields": {
+      "description": "Tên các ô để null vì không đọc được. Ví dụ ['invoice_number', 'receipt_id'].",
+      "items": {
+        "enum": [
+          "vendor",
+          "invoice_number",
+          "transaction_date",
+          "amount_minor",
+          "currency",
+          "receipt_id"
+        ],
+        "type": "string"
+      },
+      "title": "Missing Fields",
+      "type": "array"
+    }
+  },
+  "required": [
+    "submission_id",
+    "vendor",
+    "invoice_number",
+    "transaction_date",
+    "amount_minor",
+    "currency",
+    "receipt_id",
+    "missing_fields"
+  ],
+  "title": "ExpenseExtraction",
+  "type": "object"
+}

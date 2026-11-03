@@ -374,7 +374,7 @@ export default function ExpenseWorkspace({ llmMode }: { llmMode: string }) {
           <Empty icon={FileSearch} text="Chưa có chứng từ nào được kiểm tra." />
         ) : (
           <div className="table-wrap">
-            <table className="data-table">
+            <table className="data-table expense-table">
               <thead>
                 <tr><th>Mã</th><th>Nơi bán</th><th>Số hóa đơn</th><th>Biên nhận</th><th>Ngày</th><th>Số tiền</th><th>Kết quả</th><th>Duyệt</th></tr>
               </thead>

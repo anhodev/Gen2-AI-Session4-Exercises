@@ -246,6 +246,9 @@ code { font-family:ui-monospace, SFMono-Regular, Menlo, monospace; font-size:.92
 .stale-note { margin:0; font-size:12px; font-weight:700; }
 .data-table td.amount { white-space:nowrap; font-variant-numeric:tabular-nums; }
 .data-table em.null { color:#b3adbb; font-style:normal; font-size:11px; }
+/* Bảng 8 cột: ô gọn hơn, nhãn trạng thái dài được xuống dòng để không tràn ngang */
+.expense-table th, .expense-table td { padding-left:10px; padding-right:10px; }
+.expense-table .pill { white-space:normal; line-height:1.35; }
 .row-actions { display:flex; gap:4px; margin-top:6px; flex-wrap:wrap; }
 .row-actions button { border:1px solid #ded9ec; background:#faf9fd; color:#6954bb; border-radius:7px; padding:3px 7px; font-size:10.5px; font-weight:700; white-space:nowrap; }
 .row-actions button:hover:not(:disabled) { background:#f1edff; }
