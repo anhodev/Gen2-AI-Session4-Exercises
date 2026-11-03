@@ -48,7 +48,7 @@ export default function Home() {
       <aside className={`sidebar ${mobileNav ? "open" : ""}`}>
         <div className="brand">
           <div className="brand-mark"><Command size={20} /></div>
-          <div><strong>SO × Algo</strong><span>BÀI TẬP BUỔI 4</span></div>
+          <div><strong>Ho Xuan An</strong><span>BÀI TẬP BUỔI 4</span></div>
           <button className="sidebar-close" onClick={() => setMobileNav(false)}><X size={18} /></button>
         </div>
         <nav>

@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Structured Output × Thuật toán",
+  title: "GenAI2 - Ho Xuan An - Bai tap buoi 4",
   description: "GenAI đọc và điền dữ liệu. Code kiểm tra và tính kết quả.",
 };
 
