@@ -14,6 +14,9 @@ psycopg[binary]==3.2.9
 langchain-core==0.3.75
 langchain-openai==0.3.28
 
+# Bài 03: lấy chữ từ PDF có sẵn lớp chữ
+pypdf==6.17.0
+
 # Test
 pytest==8.4.1
 httpx==0.28.1
