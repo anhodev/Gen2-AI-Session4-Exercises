@@ -7,7 +7,10 @@
       dù thứ tự task trong JSON khác nhau. Số trong mã so theo giá trị: T2 trước T10, T99 trước T100.
   - Không xếp hết được nghĩa là có vòng chờ nhau: trả cycle_detected, chỉ ra một vòng cụ thể
       và các việc bị kẹt. KHÔNG trả nửa danh sách như thể đó là kế hoạch hoàn chỉnh.
-  - Độ phức tạp: O((V + E) log V) với V việc, E quan hệ.
+  - Chia đợt (làm thêm): đợt của một việc = 1 + đợt muộn nhất trong các việc nó chờ. Việc trong cùng đợt
+      không chờ nhau nên làm cùng lúc được. Đây chỉ là nhóm, KHÔNG phải lịch ngày/giờ: chưa biết thời lượng
+      và số người thì không thể nói đợt 2 bắt đầu lúc nào.
+  - Độ phức tạp: O((V + E) log V) với V việc, E quan hệ. Chia đợt thêm O(V + E).
 """
 
 from __future__ import annotations
@@ -48,6 +51,7 @@ class Step:
     waits_for: list[str]    # các việc phải xong trước (mũi tên đi vào)
     next_ready: str | None  # việc có mã nhỏ nhất cũng đang sẵn sàng lúc chọn việc này (xếp sau vì mã đứng sau)
     other_ready: int        # số việc sẵn sàng khác, ngoài next_ready
+    stage: int = 1          # đợt sớm nhất làm được: 1 nếu không chờ ai, ngược lại 1 + đợt muộn nhất của các việc phải chờ
 
 
 @dataclass(frozen=True)
@@ -58,6 +62,7 @@ class OrderResult:
     cycle: list[str] = field(default_factory=list)         # vd ["A", "C", "D", "A"]
     cycle_edges: list[Edge] = field(default_factory=list)  # các mũi tên tạo thành vòng
     blocked: list[str] = field(default_factory=list)       # mọi việc chưa xếp được (trong vòng hoặc chờ vòng)
+    stages: list[list[str]] = field(default_factory=list)  # các đợt làm cùng lúc, vd [["A", "B"], ["C"], ["D"]]; rỗng khi có vòng
     reason: str = ""
 
 
@@ -120,19 +125,25 @@ def topological_order(task_ids: list[str], edges: list[Edge]) -> OrderResult:
     heapq.heapify(heap)
     order: list[str] = []
     steps: list[Step] = []
+    stage: dict[str, int] = {}
     while heap:
         _, current = heapq.heappop(heap)
         # Chỉ xem đỉnh heap (O(1)): sắp xếp cả heap ở mỗi bước sẽ thành O(V² log V)
         next_ready = heap[0][1] if heap else None
         order.append(current)
-        steps.append(Step(current, sorted(predecessors[current], key=id_key), next_ready, max(len(heap) - 1, 0)))
+        # Mọi việc phải chờ đã được xếp trước (Kahn), nên đã có đợt. Tổng cả vòng lặp: O(E).
+        stage[current] = 1 + max((stage[p] for p in predecessors[current]), default=0)
+        steps.append(Step(
+            current, sorted(predecessors[current], key=id_key), next_ready, max(len(heap) - 1, 0), stage[current],
+        ))
         for nxt in successors[current]:
             indegree[nxt] -= 1
             if indegree[nxt] == 0:
                 heapq.heappush(heap, (id_key(nxt), nxt))
 
     if len(order) == len(task_ids):
-        return OrderResult(ORDERED, order, steps, reason=explain_order(order, edges))
+        stages = group_stages(order, stage)
+        return OrderResult(ORDERED, order, steps, stages=stages, reason=explain_order(order, edges, stages))
 
     placed = set(order)
     blocked = sorted((t for t in task_ids if t not in placed), key=id_key)
@@ -144,6 +155,20 @@ def topological_order(task_ids: list[str], edges: list[Edge]) -> OrderResult:
         blocked=blocked,
         reason=explain_cycle(cycle, blocked),
     )
+
+
+def group_stages(order: list[str], stage: dict[str, int]) -> list[list[str]]:
+    """
+    Gom việc theo đợt, trong mỗi đợt xếp theo mã. Phải sắp lại vì việc cùng đợt có thể ra khỏi heap
+    không theo mã: vd C (đợt 2, sẵn sàng muộn) ra sau D (đợt 2, sẵn sàng sớm) dù C đứng trước D.
+
+    Returns:
+        list[list[str]]: Đợt 1, đợt 2…, vd [["A", "B"], ["C"], ["D"]].
+    """
+    groups: list[list[str]] = [[] for _ in range(max(stage.values(), default=0))]
+    for task_id in order:
+        groups[stage[task_id] - 1].append(task_id)
+    return [sorted(g, key=id_key) for g in groups]
 
 
 def find_cycle(blocked: list[str], predecessors: dict[str, list[str]], placed: set[str]) -> list[str]:
@@ -173,13 +198,16 @@ def find_cycle(blocked: list[str], predecessors: dict[str, list[str]], placed: s
 
 # --- Lý do --------------------------------------------------------------------
 
-def explain_order(order: list[str], edges: list[Edge]) -> str:
+def explain_order(order: list[str], edges: list[Edge], stages: list[list[str]]) -> str:
     if not edges:
         return f"Không có quan hệ trước-sau: {len(order)} việc đều bắt đầu được ngay, xếp theo mã."
-    return (
+    text = (
         f"Xếp được cả {len(order)} việc, mọi quan hệ trước-sau đều được giữ. "
         "Khi nhiều việc cùng bắt đầu được, chọn mã đứng trước."
     )
+    if len(stages) < len(order):
+        text += f" Chia được {len(stages)} đợt: việc trong cùng đợt không chờ nhau nên làm cùng lúc được."
+    return text
 
 
 def explain_cycle(cycle: list[str], blocked: list[str]) -> str:

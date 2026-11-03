@@ -299,3 +299,14 @@ code { font-family:ui-monospace, SFMono-Regular, Menlo, monospace; font-size:.92
   .task-line input.owner { flex-basis:100%; order:3; }
   .cycle-deps li { flex-direction:column; }
 }
+
+/* --- Bài 04 (làm thêm): nhóm việc làm cùng lúc --- */
+.stages { display:flex; flex-direction:column; gap:10px; }
+.stages-note { margin:0; font-size:12px; color:var(--muted); line-height:1.5; display:flex; gap:6px; align-items:flex-start; }
+.stages-note svg { flex:none; margin-top:2px; color:#8a7fd0; }
+.stage-lanes { display:flex; flex-wrap:wrap; gap:10px; }
+.stage-lane { flex:1 1 140px; max-width:260px; display:flex; flex-direction:column; gap:6px; background:#faf9fd; border:1px solid var(--line); border-radius:11px; padding:10px; }
+.stage-label { font-size:11px; font-weight:800; text-transform:uppercase; letter-spacing:.05em; color:#5b3fe0; display:flex; flex-direction:column; gap:2px; }
+.stage-label em { font-style:normal; font-weight:600; text-transform:none; letter-spacing:0; color:var(--muted); }
+.stage-task { display:flex; gap:8px; align-items:flex-start; background:#fff; border:1px solid var(--line); border-radius:9px; padding:7px 8px; font-size:12px; line-height:1.4; }
+.stage-task small { display:block; font-size:11px; color:var(--muted); }

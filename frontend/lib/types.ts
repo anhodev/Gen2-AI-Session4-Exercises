@@ -297,6 +297,12 @@ export interface OrderStep {
   task: PlanTask;
   waits_for: string[];
   reason: string;
+  stage: number | null; // đợt sớm nhất làm được; null với lần tính lưu trước khi có chia đợt
+}
+
+export interface OrderStage {
+  stage: number;
+  tasks: PlanTask[]; // không chờ nhau, làm cùng lúc được
 }
 
 export interface OrderOut {
@@ -306,6 +312,7 @@ export interface OrderOut {
   status: OrderStatus;
   reason: string;
   steps: OrderStep[];                    // rỗng khi có vòng
+  stages: OrderStage[];                  // nhóm việc làm cùng lúc; rỗng khi có vòng
   cycle: string[];                       // vd ["T01", "T03", "T04", "T01"]
   cycle_dependencies: PlanDependency[];
   blocked: PlanTask[];

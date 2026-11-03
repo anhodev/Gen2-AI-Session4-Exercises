@@ -114,6 +114,73 @@ def test_ready_task_with_smaller_id_jumps_ahead():
     assert result.order == ["B", "C", "D"]
 
 
+# --- Chia đợt (làm thêm) ----------------------------------------------------
+
+def is_valid_stages(stages, tasks, edges) -> bool:
+    """Đủ mọi việc, mỗi việc một lần; mũi tên luôn đi sang đợt sau; mỗi việc ở đợt sớm nhất có thể."""
+    stage = {t: n for n, group in enumerate(stages, start=1) for t in group}
+    if sorted(stage) != sorted(tasks) or sum(map(len, stages)) != len(tasks):
+        return False
+    if any(stage[a] >= stage[b] for a, b in edges):
+        return False
+    before = {t: {a for a, b in edges if b == t} for t in tasks}
+    # Đợt sớm nhất: đợt 1 thì không chờ ai; đợt k > 1 thì chờ ít nhất một việc ở đợt k - 1
+    return all(
+        (not before[t]) if stage[t] == 1 else any(stage[p] == stage[t] - 1 for p in before[t])
+        for t in tasks
+    )
+
+
+def test_exercise_stages():
+    result = topological_order(TASKS, EDGES)
+    assert result.stages == [["A", "B"], ["C"], ["D"]]
+    assert [s.stage for s in result.steps] == [1, 1, 2, 3]
+    assert "Chia được 3 đợt" in result.reason
+
+
+def test_qr_launch_plan_stages():
+    edges = [("A", "B"), ("A", "C"), ("B", "E"), ("C", "E"), ("D", "F"), ("C", "F"), ("E", "G"), ("F", "G")]
+    result = topological_order(list("ABCDEFG"), edges)
+    # F chờ D (đợt 1) và C (đợt 2) nên ở đợt 3, không phải đợt 2
+    assert result.stages == [["A", "D"], ["B", "C"], ["E", "F"], ["G"]]
+
+
+def test_no_dependencies_is_one_stage():
+    result = topological_order(["C", "A", "B"], [])
+    assert result.stages == [["A", "B", "C"]]
+
+
+def test_chain_has_one_task_per_stage_and_no_stage_note():
+    result = topological_order(["A", "B", "C"], [("A", "B"), ("B", "C")])
+    assert result.stages == [["A"], ["B"], ["C"]]
+    assert "đợt" not in result.reason  # không có gì làm cùng lúc được thì không nói
+
+
+def test_stage_is_sorted_by_id_even_if_ready_later():
+    # D chờ A, C chờ Z: D ra khỏi heap trước C nhưng cùng đợt 2, trong đợt vẫn xếp theo mã
+    result = topological_order(["A", "C", "D", "Z"], [("A", "D"), ("Z", "C")])
+    assert result.order == ["A", "D", "Z", "C"]
+    assert result.stages == [["A", "Z"], ["C", "D"]]
+
+
+def test_cycle_has_no_stages():
+    result = topological_order(TASKS, EDGES + [("D", "A")])
+    assert result.stages == []
+
+
+@pytest.mark.parametrize("seed", range(100))
+def test_stages_are_valid_on_random_graphs(seed):
+    rng = random.Random(1000 + seed)
+    tasks = [f"T{i:02d}" for i in range(1, rng.randint(1, 12) + 1)]
+    # Chỉ nối từ mã nhỏ sang mã lớn để không có vòng, rồi xáo thứ tự
+    edges = [(a, b) for i, a in enumerate(tasks) for b in tasks[i + 1:] if rng.random() < 0.25]
+    rng.shuffle(tasks)
+    rng.shuffle(edges)
+    result = topological_order(tasks, edges)
+    assert is_valid_stages(result.stages, tasks, edges)
+    assert all(group == sorted(group, key=id_key) for group in result.stages)
+
+
 # --- Ca sát giới hạn --------------------------------------------------------
 
 def test_numbers_in_ids_compare_by_value():
@@ -218,3 +285,4 @@ def test_10000_tasks_run_fast():
     result = topological_order(ids, edges)
     assert time.perf_counter() - started < 1.0  # O((V + E) log V)
     assert result.status == ORDERED and is_valid_order(result.order, edges)
+    assert is_valid_stages(result.stages, ids, edges)

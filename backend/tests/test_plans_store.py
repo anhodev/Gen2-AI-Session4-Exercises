@@ -62,13 +62,15 @@ def test_saved_row_and_run_match(db):
     assert [s["task"]["id"] for s in row.result["steps"]] == ["T02", "T01", "T03", "T04"]
     assert run.status == "confirmed"
     assert run.result["order"] == ["T02", "T01", "T03", "T04"] and run.result["order_id"] == row.id
+    assert run.result["stages"] == [["T02", "T03", "T04"], ["T01"]]
+    assert [t["id"] for t in row.result["stages"][0]["tasks"]] == ["T02", "T03", "T04"]
 
 
 def test_run_result_shows_cycle_instead_of_order(db):
     run = new_run(db)
     compute(db, run, plan(("T01", "T02"), ("T02", "T01")))
     assert run.result["cycle"] == ["T01", "T02", "T01"]
-    assert "order" not in run.result
+    assert "order" not in run.result and "stages" not in run.result
 
 
 def test_first_plan_uses_system_ids(db):

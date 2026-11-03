@@ -5,7 +5,7 @@
 //        (3) code tính thứ tự bằng topological sort, hoặc báo vòng chờ nhau  (4) lịch sử các lần tính.
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  ArrowRight, CheckCircle2, GitBranch, History, ListOrdered, Loader2, Plus, Quote, RefreshCw, Repeat, Sparkles, Trash2, Upload,
+  ArrowRight, CheckCircle2, GitBranch, History, Layers, ListOrdered, Loader2, Plus, Quote, RefreshCw, Repeat, Sparkles, Trash2, Upload,
 } from "lucide-react";
 import clsx from "clsx";
 import { api, ApiError } from "@/lib/api";
@@ -406,13 +406,15 @@ function OrderView({ result }: { result: OrderOut }) {
           <div><strong>Thứ tự thực hiện</strong><span>{result.reason}</span></div>
         </div>
       </div>
+      {result.stages.length > 0 && <StageView stages={result.stages} />}
       <div className="table-wrap">
         <table className="data-table">
-          <thead><tr><th>#</th><th>Mã</th><th>Công việc</th><th>Phụ trách</th><th>Vì sao ở vị trí này</th></tr></thead>
+          <thead><tr><th>#</th><th>Đợt</th><th>Mã</th><th>Công việc</th><th>Phụ trách</th><th>Vì sao ở vị trí này</th></tr></thead>
           <tbody>
             {result.steps.map((s) => (
               <tr key={s.task.id}>
                 <td className="pos">{s.position}</td>
+                <td>{s.stage ?? "—"}</td>
                 <td><span className="task-id">{s.task.id}</span></td>
                 <td>{s.task.title}</td>
                 <td>{s.task.owner ?? <em className="null">null</em>}</td>
@@ -423,6 +425,33 @@ function OrderView({ result }: { result: OrderOut }) {
         </table>
       </div>
     </>
+  );
+}
+
+/**
+ * Nhóm việc làm cùng lúc (làm thêm). Việc trong cùng đợt không chờ nhau.
+ * Chỉ là nhóm: chưa có thời lượng và số người nên không đổi thành ngày giờ.
+ */
+function StageView({ stages }: { stages: OrderOut["stages"] }) {
+  return (
+    <div className="stages">
+      <p className="stages-note">
+        <Layers size={14} /> Nhóm việc làm cùng lúc: việc trong cùng đợt không chờ nhau. Đây không phải lịch ngày giờ, vì chưa biết mỗi việc mất bao lâu và có bao nhiêu người.
+      </p>
+      <div className="stage-lanes">
+        {stages.map((g) => (
+          <div key={g.stage} className="stage-lane">
+            <span className="stage-label">Đợt {g.stage}{g.tasks.length > 1 && <em>{g.tasks.length} việc cùng lúc</em>}</span>
+            {g.tasks.map((t) => (
+              <div key={t.id} className="stage-task">
+                <span className="task-id">{t.id}</span>
+                <span>{t.title}<small>{t.owner ?? "chưa rõ ai phụ trách"}</small></span>
+              </div>
+            ))}
+          </div>
+        ))}
+      </div>
+    </div>
   );
 }
 

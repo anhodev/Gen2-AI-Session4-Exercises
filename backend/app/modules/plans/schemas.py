@@ -145,6 +145,14 @@ class StepOut(BaseModel):
     task: TaskIn
     waits_for: list[str]   # mã các việc phải xong trước
     reason: str            # vd "Chờ T01, T02 xong"
+    stage: int | None = None  # đợt sớm nhất làm được. None: lần tính lưu trước khi có chia đợt
+
+
+class StageOut(BaseModel):
+    """Một đợt: các việc không chờ nhau, làm cùng lúc được. Không phải lịch ngày/giờ."""
+
+    stage: int             # 1, 2…
+    tasks: list[TaskIn]
 
 
 class OrderOut(BaseModel):
@@ -154,6 +162,7 @@ class OrderOut(BaseModel):
     status: Literal["ordered", "cycle_detected"]
     reason: str
     steps: list[StepOut]                 # rỗng khi có vòng: không trả nửa danh sách
+    stages: list[StageOut] = []          # nhóm việc làm cùng lúc; rỗng khi có vòng
     cycle: list[str]                     # vd ["T01", "T03", "T04", "T01"]
     cycle_dependencies: list[DependencyIn]  # các quan hệ tạo thành vòng, kèm câu bằng chứng để người dùng sửa
     blocked: list[TaskIn]                # mọi việc chưa xếp được (trong vòng hoặc chờ vòng)

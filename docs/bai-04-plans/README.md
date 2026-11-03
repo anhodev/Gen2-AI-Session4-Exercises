@@ -13,6 +13,7 @@ Sau buổi họp, nhóm có nhiều việc phải làm: chốt API, duyệt giao
 | Cấp mã việc | Hệ thống | Đổi mã tạm của GenAI (A, B, 1, 2…) sang T01, T02… theo thứ tự xuất hiện. Việc người dùng thêm cũng được backend cấp mã |
 | Xem và sửa | Người dùng | Sửa tên, người phụ trách; thêm hoặc xóa việc và quan hệ. Ô mã bị khóa |
 | Xếp thứ tự | **Code** | Topological sort (Kahn + min-heap). GenAI **không** xếp thứ tự và **không** tự sửa vòng |
+| Nhóm việc làm cùng lúc | **Code** | Chia các việc thành đợt (phần làm thêm). Không đổi thành lịch ngày giờ |
 | Sửa vòng | Người dùng | Xem các quan hệ tạo thành vòng (kèm câu bằng chứng), xóa hoặc sửa một quan hệ rồi tính lại |
 
 ```
@@ -111,12 +112,24 @@ Mỗi việc là một đỉnh, quan hệ "A trước C" là mũi tên A → C.
 
 Tìm vòng (`find_cycle`): mỗi việc bị kẹt còn ít nhất một việc trước nó cũng bị kẹt (nếu không thì nó đã được xếp). Đi ngược theo việc trước bị kẹt, sau tối đa V bước sẽ gặp lại một việc đã đi qua, và đó là vòng. Cách này dùng vòng lặp, không đệ quy, nên chuỗi 50.000 việc cũng không bị lỗi tràn đệ quy.
 
+### Nhóm việc làm cùng lúc (làm thêm)
+
+Mỗi việc thuộc một **đợt**: đợt 1 nếu không phải chờ ai, ngược lại là 1 + đợt muộn nhất trong các việc nó chờ. Việc trong cùng đợt không chờ nhau, nên làm cùng lúc được.
+
+- Đợt được tính ngay trong vòng lặp Kahn. Khi một việc ra khỏi heap, mọi việc nó chờ đã được xếp và đã có đợt. Tổng cộng thêm O(V + E).
+- Mỗi việc nằm ở **đợt sớm nhất có thể**: việc ở đợt k > 1 luôn chờ ít nhất một việc ở đợt k − 1.
+- Trong mỗi đợt, việc xếp theo mã. Phải sắp lại, vì việc cùng đợt có thể ra khỏi heap không theo mã: D chờ A, C chờ Z, thì D ra trước C dù cùng đợt 2.
+- **Thứ tự và đợt trả lời 2 câu hỏi khác nhau.** Thứ tự là một cách làm lần lượt từng việc. Đợt cho biết việc nào làm song song được. Ở mẫu 6, T04 thuộc đợt 1 nhưng đứng thứ 4 trong thứ tự, vì T02, T03 có mã nhỏ hơn và đã sẵn sàng.
+- **Không phải lịch.** Đề nói chưa có thời lượng và số người thì đừng biến thứ tự thành lịch ngày giờ. App chỉ nói "đợt 2 làm sau khi đợt 1 xong phần nó cần", không nói đợt 2 bắt đầu lúc nào. Một việc ngắn ở đợt 2 có thể bắt đầu ngay khi các việc nó chờ xong, không cần đợi cả đợt 1.
+- Có vòng thì không chia đợt (`stages` rỗng), giống như không trả thứ tự.
+
 Chính thuật toán cũng chặn mã trùng, mã lạ và việc tự chờ chính nó (`build_graph`). Vì vậy, nếu có ai gọi thẳng thuật toán mà bỏ qua bước kiểm tra, dữ liệu sai cũng không ra thứ tự sai.
 
 | Thao tác | Độ phức tạp |
 |---|---|
 | Xếp thứ tự V việc, E quan hệ | O((V + E) log V): mỗi việc vào và ra heap một lần |
 | Tìm vòng | O(V + E) |
+| Chia đợt | O(V + E), làm cùng lúc với việc xếp thứ tự |
 | 10.000 việc, khoảng 25.000 quan hệ | khoảng 40 ms (test đặt giới hạn 1 giây) |
 
 Test đối chiếu kết quả với cách thử mọi hoán vị (brute force) trên 200 đồ thị ngẫu nhiên. Hoán vị hợp lệ đầu tiên theo alphabet phải đúng bằng thứ tự Kahn + heap ra. Khi không có hoán vị nào hợp lệ, vòng trả về phải là vòng có thật.
@@ -125,7 +138,7 @@ Test đối chiếu kết quả với cách thử mọi hoán vị (brute force)
 
 | Dữ liệu | Kết quả |
 |---|---|
-| A → C, B → C, C → D | `ordered`: A, B, C, D (T01 → T02 → T03 → T04). A và B cùng bắt đầu được, chọn A vì mã đứng trước |
+| A → C, B → C, C → D | `ordered`: A, B, C, D (T01 → T02 → T03 → T04). A và B cùng bắt đầu được, chọn A vì mã đứng trước. Chia 3 đợt: {A, B}, {C}, {D} |
 | Thêm D → A | `cycle_detected`: vòng A → C → D → A (T01 → T03 → T04 → T01). B không trong vòng nhưng vẫn không có thứ tự nửa vời |
 | Xóa D → A | `ordered` lại như ban đầu |
 
@@ -137,7 +150,7 @@ Test đối chiếu kết quả với cách thử mọi hoán vị (brute force)
 |---|---|---|
 | `POST /plans/extract` | Nhận `text`. GenAI đọc, code kiểm tra, cấp mã T01…, lưu lịch sử. Trả `llm_output`, `llm_issues`, `plan`, `issues`, `can_order`, `run_id`. **Chưa** tính thứ tự | 422 biên bản rỗng hoặc quá dài |
 | `POST /plans/validate` | Nhận `run_id` và bản đang sửa. Kiểm tra lại, cấp mã cho việc mới (`id: null`). **Không lưu gì** | 404 không thấy lần extract; 422 sai khuôn |
-| `POST /plans/order` | Nhận `run_id` và bản đã xác nhận. Kiểm tra lại, xếp thứ tự, **lưu lần tính này**. Có vòng vẫn trả 200 với `status: "cycle_detected"` | 400 còn lỗi (mã lạ, mã trùng, tự chờ chính nó, mã không do hệ thống cấp), không lưu gì; 404; 422 |
+| `POST /plans/order` | Nhận `run_id` và bản đã xác nhận. Kiểm tra lại, xếp thứ tự, chia đợt (`stages`, mỗi bước có `stage`), **lưu lần tính này**. Có vòng vẫn trả 200 với `status: "cycle_detected"` | 400 còn lỗi (mã lạ, mã trùng, tự chờ chính nó, mã không do hệ thống cấp), không lưu gì; 404; 422 |
 | `GET /plans/samples` | Biên bản mẫu cho chế độ mock | |
 | `GET /plans/orders?run_id=&limit=` | Các lần tính, mới nhất trước | |
 | `GET /plans/orders/{order_id}` | Một lần tính, đọc từ database đúng như lúc tính | 404 |
@@ -182,7 +195,7 @@ Lệnh thứ hai thêm T04 → T01 nên trả `cycle_detected`. Thay `run_id` b�
    - Mã lạ do GenAI trả vẫn hiện trong ô chọn, ví dụ "B (không có trong danh sách)", để người dùng thấy và chọn lại.
    - Mỗi lần sửa, bản nháp được gửi `/plans/validate` sau khi ngừng gõ khoảng 0,35 giây. Lỗi bám theo dòng, nên không nhảy sai chỗ khi thêm hoặc xóa dòng khác. Còn lỗi thì nút "Tính thứ tự" bị khóa.
 3. **Kết quả:**
-   - **Xếp được:** bảng thứ tự kèm lý do từng việc.
+   - **Xếp được:** các đợt làm cùng lúc (mỗi đợt một cột), rồi bảng thứ tự kèm đợt và lý do từng việc.
    - **Có vòng:** đường đi của vòng, từng quan hệ kèm câu bằng chứng và nút "Xóa quan hệ này". Các quan hệ đó cũng được tô đỏ ở bước 2.
    - **Sửa sau khi tính:** trang báo bản đang sửa khác bản đã tính, kèm nút nạp lại bản của lần tính đó.
 4. **Các lần tính của biên bản:** bấm một dòng để xem lại đúng như lúc tính.
@@ -193,11 +206,11 @@ Chạy `cd backend && myenv/bin/python -m pytest -q`. Thuật toán được tes
 
 | File | Số test | Nội dung |
 |---|---|---|
-| [`test_plans_algo.py`](../../backend/tests/test_plans_algo.py) | 222 | Thuật toán thuần, chia 3 nhóm theo đề: ca thường, ca sát giới hạn, dữ liệu sai. So với brute force trên 200 đồ thị ngẫu nhiên, 10.000 việc dưới 1 giây, vòng 50.000 việc |
+| [`test_plans_algo.py`](../../backend/tests/test_plans_algo.py) | 328 | Thuật toán thuần, chia 3 nhóm theo đề: ca thường, ca sát giới hạn, dữ liệu sai. So với brute force trên 200 đồ thị ngẫu nhiên, 10.000 việc dưới 1 giây, vòng 50.000 việc. Chia đợt: kiểm tra trên 100 đồ thị ngẫu nhiên rằng mũi tên luôn sang đợt sau và mỗi việc ở đợt sớm nhất |
 | [`test_plans_validation.py`](../../backend/tests/test_plans_validation.py) | 57 | Mẫu JSON, kiểm tra 2 lớp, cấp mã, câu bằng chứng, từng biên bản mẫu |
 | [`test_plans_extractor.py`](../../backend/tests/test_plans_extractor.py) | 29 | GenAI (mock và giả lập lỗi model), prompt, schema đổi sang tool OpenAI |
 | [`test_plans_store.py`](../../backend/tests/test_plans_store.py) | 5 | Database: mỗi lần tính một dòng, đánh số lần tính, cập nhật run |
-| [`test_plans_api.py`](../../backend/tests/test_plans_api.py) | 21 | Toàn bộ API bằng `TestClient`, lưu lại sau khi khởi động lại app |
+| [`test_plans_api.py`](../../backend/tests/test_plans_api.py) | 22 | Toàn bộ API bằng `TestClient`, lưu lại sau khi khởi động lại app, đọc được lần tính lưu trước khi có chia đợt |
 
 ### Đối chiếu phần "Tự kiểm tra" của đề
 
@@ -215,6 +228,7 @@ Chạy `cd backend && myenv/bin/python -m pytest -q`. Thuật toán được tes
 | GenAI không tự thêm quan hệ khi không có bằng chứng | `test_evidence_not_in_minutes_is_warning_only`, `test_invented_dependency_is_warned`, `test_system_prompt_states_rules` |
 | Chỉ dùng quan hệ người dùng đã xác nhận | `test_added_task_and_dependency_without_evidence`, `test_model_failure_run_can_still_be_filled_by_hand` |
 | O((V + E) log V) | `test_10000_tasks_run_fast`, `test_matches_brute_force_on_random_graphs` |
+| Làm thêm: nhóm việc làm cùng lúc | `test_exercise_stages`, `test_qr_launch_plan_stages`, `test_stage_is_sorted_by_id_even_if_ready_later`, `test_stages_are_valid_on_random_graphs`, `test_cycle_has_no_stages` |
 
 ## 8. Dữ liệu mẫu (chế độ mock)
 
@@ -253,13 +267,18 @@ Chế độ mock chọn mẫu **dài nhất** có nội dung nằm trong prompt.
 
 ![Xóa vòng và tính lại](images/04-xoa-vong-tinh-lai.jpg)
 
+**Nhóm việc làm cùng lúc (mẫu 6, ra mắt thanh toán QR):** 4 đợt. T01 chốt yêu cầu và T04 ký hợp đồng ngân hàng làm cùng lúc ở đợt 1. T06 kết nối cổng ngân hàng chờ T04 (đợt 1) và T03 (đợt 2), nên ở đợt 3. Ghi chú nói rõ đây không phải lịch ngày giờ.
+
+![Nhóm việc làm cùng lúc](images/06-nhom-lam-cung-luc.jpg)
+
 **Hai việc cùng mã (mẫu 9):** mỗi việc vẫn được mã riêng. Các quan hệ dùng `B` hiện "B (không có trong danh sách)" và báo lỗi đúng dòng. JSON gốc tự mở để thấy lý do: "Mã B bị trùng".
 
 ![Hai việc cùng mã](images/05-ma-trung.jpg)
 
 ## 10. Giới hạn và các quyết định
 
-- **Thứ tự không phải lịch.** App chỉ nói việc nào trước việc nào, không có thời lượng hay số người nên không tự đổi thành ngày giờ.
+- **Thứ tự và đợt không phải lịch.** App chỉ nói việc nào trước việc nào và việc nào làm cùng lúc được. Không có thời lượng hay số người nên không tự đổi thành ngày giờ, và không nói một đợt cần bao nhiêu người.
+- **Lần tính lưu trước khi có chia đợt** vẫn đọc lại được, chỉ là không có đợt (`stages` rỗng, `stage` là `null`).
 - **Chỉ báo một vòng.** Đồ thị có nhiều vòng thì sửa vòng này, tính lại sẽ thấy vòng tiếp theo. Danh sách `blocked` cho biết mọi việc đang bị kẹt.
 - **Câu bằng chứng chỉ được so khớp chuỗi**, sau khi chuẩn hóa. GenAI viết lại câu bằng lời khác thì bị cảnh báo dù quan hệ đúng. Ngược lại, câu có thật trong biên bản không chứng minh GenAI hiểu đúng hướng mũi tên. Người dùng vẫn cần đọc lại.
 - **Mã việc chỉ có nghĩa trong một kế hoạch.** Xóa T04 rồi thêm việc mới thì việc mới có thể nhận lại T04. Các lần tính cũ vẫn đúng vì mỗi lần lưu cả tên việc.

@@ -64,13 +64,16 @@ def test_order_exercise_example(client):
     assert out["steps"][0]["task"]["title"] == "Chốt yêu cầu API"
     assert out["steps"][2]["reason"] == "Chờ T01, T02 xong"
     assert out["cycle"] == [] and out["blocked"] == []
+    assert [[t["id"] for t in g["tasks"]] for g in out["stages"]] == [["T01", "T02"], ["T03"], ["T04"]]
+    assert [s["stage"] for s in out["steps"]] == [1, 1, 2, 3]
+    assert client.get(f"/plans/orders/{out['order_id']}").json()["stages"] == out["stages"]
 
 
 def test_cycle_is_reported_with_evidence_and_saved(client):
     data = extract(client, 2)
     out = order(client, data["run_id"], data["plan"]).json()
     assert out["status"] == "cycle_detected"
-    assert out["steps"] == []  # không trả nửa danh sách
+    assert out["steps"] == [] and out["stages"] == []  # không trả nửa danh sách
     assert out["cycle"] == ["T01", "T03", "T04", "T01"]
     assert out["cycle_dependencies"][-1] == {
         "before": "T04", "after": "T01", "evidence": "Product chỉ chốt API sau khi QA kiểm thử xong",
@@ -234,3 +237,22 @@ def test_times_are_shown_in_app_timezone(client):
     out = order(client, data["run_id"], data["plan"]).json()
     history = client.get("/plans/orders").json()
     assert out["created_at"].endswith("+07:00") and history[0]["created_at"].endswith("+07:00")
+
+
+def test_order_saved_before_stages_still_loads(tmp_path):
+    # Lần tính lưu trước khi có chia đợt: result không có "stages", steps không có "stage"
+    from app.modules.plans.entities import PlanOrder
+
+    settings = Settings(database_url=f"sqlite:///{tmp_path}/old.db", mock_llm=True)
+    app = create_app(settings)
+    with TestClient(app) as c:
+        data = extract(c, 1)
+        order_id = order(c, data["run_id"], data["plan"]).json()["order_id"]
+        with app.state.session_factory() as db:
+            row = db.get(PlanOrder, order_id)
+            old = {k: v for k, v in row.result.items() if k != "stages"}
+            old["steps"] = [{k: v for k, v in step.items() if k != "stage"} for step in old["steps"]]
+            row.result = old
+            db.commit()
+        out = c.get(f"/plans/orders/{order_id}").json()
+        assert out["stages"] == [] and out["steps"][0]["stage"] is None

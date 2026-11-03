@@ -24,7 +24,7 @@ def result_payload(plan: PlanOut, result: OrderResult) -> dict:
     Kết quả thuật toán, kèm tên việc và câu bằng chứng, để lưu và trả về mà không cần tính lại.
 
     Returns:
-        dict: status, reason, steps, cycle, cycle_dependencies, blocked (dạng JSON).
+        dict: status, reason, steps, stages, cycle, cycle_dependencies, blocked (dạng JSON).
     """
     tasks = {t.id: t.model_dump() for t in plan.tasks}
     evidence = {(d.before, d.after): d.evidence for d in plan.dependencies}
@@ -32,9 +32,10 @@ def result_payload(plan: PlanOut, result: OrderResult) -> dict:
         "status": result.status,
         "reason": result.reason,
         "steps": [
-            {"position": n, "task": tasks[s.task_id], "waits_for": s.waits_for, "reason": explain_step(s)}
+            {"position": n, "task": tasks[s.task_id], "waits_for": s.waits_for, "reason": explain_step(s), "stage": s.stage}
             for n, s in enumerate(result.steps, start=1)
         ],
+        "stages": [{"stage": n, "tasks": [tasks[t] for t in group]} for n, group in enumerate(result.stages, start=1)],
         "cycle": result.cycle,
         "cycle_dependencies": [
             {"before": a, "after": b, "evidence": evidence[(a, b)]} for a, b in result.cycle_edges
@@ -84,6 +85,7 @@ def save_order(db: Session, run: Run, plan: PlanOut, result: OrderResult, warnin
     summary = {"order_id": row.id, "version": version, "status": result.status, "reason": result.reason}
     if result.order:
         summary["order"] = result.order
+        summary["stages"] = result.stages
     else:
         summary["cycle"] = result.cycle
     mark_confirmed(run, plan.model_dump(), summary, baseline=first_plan(run))
