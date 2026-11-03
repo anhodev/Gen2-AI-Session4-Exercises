@@ -1,0 +1,162 @@
+[
+  {
+    "label": "Mẫu 1 - E01 ABC Travel (bản gốc)",
+    "note": "Ví dụ trong đề: đủ mã biên nhận và số hóa đơn -> chưa trùng theo quy tắc",
+    "input": "ABC TRAVEL\nHÓA ĐƠN DỊCH VỤ\nSố hóa đơn: INV-0042\nMã biên nhận: R-42\nNgày: 19/10/2026\nVé máy bay HAN - SGN\nTổng cộng: 1.250.000 VND",
+    "expect_can_check": true,
+    "llm_output": {
+      "submission_id": "{submission_id}",
+      "vendor": "ABC Travel",
+      "invoice_number": "INV-0042",
+      "transaction_date": "2026-10-19",
+      "amount_minor": 1250000,
+      "currency": "VND",
+      "receipt_id": "R-42",
+      "missing_fields": []
+    }
+  },
+  {
+    "label": "Mẫu 2 - E02 gửi lại (chữ thường, dấu cách thừa)",
+    "note": "Ví dụ trong đề: cùng chứng từ E01 gửi lại qua email -> ứng viên trùng E01",
+    "input": "Fw: chứng từ công tác\nNơi bán:   abc   travel\nSố HĐ: inv-0042\nBiên nhận: R-42\nNgày 19/10/2026 - Số tiền 1.250.000 đ",
+    "expect_can_check": true,
+    "llm_output": {
+      "submission_id": "{submission_id}",
+      "vendor": "  abc   travel ",
+      "invoice_number": "inv-0042",
+      "transaction_date": "2026-10-19",
+      "amount_minor": 1250000,
+      "currency": "VND",
+      "receipt_id": "R-42",
+      "missing_fields": []
+    }
+  },
+  {
+    "label": "Mẫu 3 - E03 thiếu mã (ảnh chụp mờ)",
+    "note": "Ví dụ trong đề: không đọc được số hóa đơn và mã biên nhận -> cần người xem lại",
+    "input": "ABC Travel\n[ảnh mờ, không đọc được số hóa đơn]\nNgày 19/10/2026\nThành tiền 1.250.000 VND",
+    "expect_can_check": true,
+    "llm_output": {
+      "submission_id": "{submission_id}",
+      "vendor": "ABC Travel",
+      "invoice_number": null,
+      "transaction_date": "2026-10-19",
+      "amount_minor": 1250000,
+      "currency": "VND",
+      "receipt_id": null,
+      "missing_fields": ["invoice_number", "receipt_id"]
+    }
+  },
+  {
+    "label": "Mẫu 4 - Cùng biên nhận, số tiền khác",
+    "note": "Mã biên nhận R-42 trùng E01 nhưng số tiền 1.350.000 -> vẫn đánh dấu trùng và hiện chênh lệch",
+    "input": "ABC TRAVEL\nSố hóa đơn: INV-0042\nMã biên nhận: R-42\nNgày: 19/10/2026\nTổng cộng: 1.350.000 VND",
+    "expect_can_check": true,
+    "llm_output": {
+      "submission_id": "{submission_id}",
+      "vendor": "ABC Travel",
+      "invoice_number": "INV-0042",
+      "transaction_date": "2026-10-19",
+      "amount_minor": 1350000,
+      "currency": "VND",
+      "receipt_id": "R-42",
+      "missing_fields": []
+    }
+  },
+  {
+    "label": "Mẫu 5 - Gửi lại nhưng thiếu biên nhận",
+    "note": "Không có mã biên nhận, nhưng nơi bán + số hóa đơn trùng E01 -> nhãn thứ hai tìm ra E01",
+    "input": "ABC Travel - Hóa đơn INV-0042\nNgày 19/10/2026\nTổng: 1.250.000 VND\n(bản scan không có trang biên nhận)",
+    "expect_can_check": true,
+    "llm_output": {
+      "submission_id": "{submission_id}",
+      "vendor": "ABC Travel",
+      "invoice_number": "INV-0042",
+      "transaction_date": "2026-10-19",
+      "amount_minor": 1250000,
+      "currency": "VND",
+      "receipt_id": null,
+      "missing_fields": ["receipt_id"]
+    }
+  },
+  {
+    "label": "Mẫu 6 - INV0042 không có gạch nối",
+    "note": "INV0042 khác INV-0042, không có mã biên nhận -> không bị coi là trùng E01",
+    "input": "ABC TRAVEL\nSố hóa đơn: INV0042\nNgày: 20/10/2026\nTổng cộng: 980.000 VND",
+    "expect_can_check": true,
+    "llm_output": {
+      "submission_id": "{submission_id}",
+      "vendor": "ABC Travel",
+      "invoice_number": "INV0042",
+      "transaction_date": "2026-10-20",
+      "amount_minor": 980000,
+      "currency": "VND",
+      "receipt_id": null,
+      "missing_fields": ["receipt_id"]
+    }
+  },
+  {
+    "label": "Mẫu 7 - Khách sạn trả bằng USD",
+    "note": "125,50 USD -> amount_minor = 12550 cent",
+    "input": "SUNRISE HOTEL SINGAPORE\nInvoice No: SH-2026-118\nReceipt: RC-7781\nDate: 2026-10-18\nTotal: USD 125.50",
+    "expect_can_check": true,
+    "llm_output": {
+      "submission_id": "{submission_id}",
+      "vendor": "Sunrise Hotel Singapore",
+      "invoice_number": "SH-2026-118",
+      "transaction_date": "2026-10-18",
+      "amount_minor": 12550,
+      "currency": "USD",
+      "receipt_id": "RC-7781",
+      "missing_fields": []
+    }
+  },
+  {
+    "label": "Mẫu 8 - [Lỗi] Số tiền âm",
+    "note": "Giả lập GenAI đọc nhầm dòng hoàn tiền thành tổng tiền -> amount_minor âm, bị chặn",
+    "input": "XANH SM TAXI\nSố hóa đơn: XSM-5531\nMã biên nhận: TX-5531\nNgày: 20/10/2026\nHoàn tiền: -85.000 VND",
+    "expect_can_check": false,
+    "llm_output": {
+      "submission_id": "{submission_id}",
+      "vendor": "Xanh SM Taxi",
+      "invoice_number": "XSM-5531",
+      "transaction_date": "2026-10-20",
+      "amount_minor": -85000,
+      "currency": "VND",
+      "receipt_id": "TX-5531",
+      "missing_fields": []
+    }
+  },
+  {
+    "label": "Mẫu 9 - [Lỗi] Loại tiền chưa hỗ trợ (EUR)",
+    "note": "Chứng từ bằng EUR: GenAI ghi đúng EUR, code báo chưa hỗ trợ thay vì đổi sang loại khác",
+    "input": "CAFE DE PARIS\nFacture N° FP-2210\nReçu: 88213\nDate: 17/10/2026\nTotal: 18,40 EUR",
+    "expect_can_check": false,
+    "llm_output": {
+      "submission_id": "{submission_id}",
+      "vendor": "Cafe de Paris",
+      "invoice_number": "FP-2210",
+      "transaction_date": "2026-10-17",
+      "amount_minor": 1840,
+      "currency": "EUR",
+      "receipt_id": "88213",
+      "missing_fields": []
+    }
+  },
+  {
+    "label": "Mẫu 10 - [Lỗi] GenAI tự đặt mã chứng từ",
+    "note": "Giả lập GenAI lấy số hóa đơn làm submission_id thay vì chép mã hệ thống cấp",
+    "input": "PHUC LONG COFFEE\nSố hóa đơn: PL-99012\nMã biên nhận: PLR-99012\nNgày: 21/10/2026\nTổng: 145.000đ",
+    "expect_can_check": false,
+    "llm_output": {
+      "submission_id": "PL-99012",
+      "vendor": "Phuc Long Coffee",
+      "invoice_number": "PL-99012",
+      "transaction_date": "2026-10-21",
+      "amount_minor": 145000,
+      "currency": "VND",
+      "receipt_id": "PLR-99012",
+      "missing_fields": []
+    }
+  }
+]
