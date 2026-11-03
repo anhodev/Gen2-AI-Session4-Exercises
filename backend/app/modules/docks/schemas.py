@@ -93,7 +93,8 @@ class SlotOut(BaseModel):
     start: datetime | None
     end: datetime | None
     reason: str
-    checks: list[DockCheckOut]
+    checks: list[DockCheckOut]   # khoảng bận đã gồm thời gian dọn cửa
+    cleanup_minutes: int = 0     # số phút dọn cửa sau mỗi xe
 
 
 class ConfirmRequest(BaseModel):
@@ -113,6 +114,7 @@ class BookingOut(BaseModel):
     start: datetime
     end: datetime
     edited_fields: list[str] = []   # các ô người dùng đã sửa so với GenAI
+    cleanup_minutes: int = 0        # cửa còn bận thêm chừng này phút sau giờ kết thúc để dọn
 
 
 class ScheduleBooking(BaseModel):
@@ -135,4 +137,5 @@ class ScheduleOut(BaseModel):
     timezone: str      # ví dụ "GMT+7", để UI luôn hiển thị múi giờ
     open_at: datetime
     close_at: datetime
+    cleanup_minutes: int = 0   # số phút dọn cửa sau mỗi xe, để timeline vẽ thêm
     docks: list[DockSchedule]

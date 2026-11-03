@@ -136,7 +136,8 @@ export interface SlotOut {
   start: string | null;
   end: string | null;
   reason: string;
-  checks: DockCheck[];
+  checks: DockCheck[]; // khoảng bận đã gồm thời gian dọn cửa
+  cleanup_minutes: number;
 }
 
 export interface BookingOut {
@@ -147,6 +148,7 @@ export interface BookingOut {
   start: string;
   end: string;
   edited_fields: string[];
+  cleanup_minutes: number; // cửa còn bận thêm chừng này phút sau giờ kết thúc
 }
 
 export interface ScheduleBooking {
@@ -161,5 +163,6 @@ export interface ScheduleOut {
   timezone: string; // ví dụ "GMT+7"
   open_at: string;
   close_at: string;
+  cleanup_minutes: number; // số phút dọn cửa sau mỗi xe
   docks: { dock_id: string; dock_type: DockType; bookings: ScheduleBooking[] }[];
 }

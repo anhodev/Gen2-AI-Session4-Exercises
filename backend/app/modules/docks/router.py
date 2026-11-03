@@ -7,6 +7,7 @@
   GET  /docks/schedule?date=     Lịch một ngày của tất cả cửa.
 
 Thuật toán không tin vào gợi ý cũ: lúc xác nhận, lịch có thể đã thay đổi (người khác vừa đặt).
+Thời gian dọn cửa (DOCK_CLEANUP_MINUTES) được tính ở cả lúc gợi ý và lúc xác nhận.
 """
 
 from __future__ import annotations
@@ -122,7 +123,7 @@ def suggest(
     """
     run = get_open_run(db, payload.run_id)
     parsed = check_request(payload.request, run, settings, tz)
-    return to_slot_out(find_slot(db, parsed, settings, tz))
+    return to_slot_out(find_slot(db, parsed, settings, tz), settings.dock_cleanup_minutes)
 
 
 @router.post("/bookings/confirm", response_model=BookingOut)
@@ -165,10 +166,11 @@ def confirm(
                 db, request_id, payload.dock_id, parsed.dock_type, start, end,
                 carrier=parsed.carrier, run=run,
                 user_output=parsed.model_dump(mode="json"), baseline=baseline,
+                cleanup=cleanup(settings),
             )
         except SlotTakenError as exc:
             # Không đánh dấu run là rejected: người dùng vẫn đặt lại được với gợi ý mới
-            suggestion = to_slot_out(find_slot(db, parsed, settings, tz))
+            suggestion = to_slot_out(find_slot(db, parsed, settings, tz), settings.dock_cleanup_minutes)
             raise HTTPException(status_code=409, detail={"message": str(exc), "suggestion": suggestion.model_dump(mode="json")})
         except AlreadyBookedError as exc:
             raise HTTPException(status_code=409, detail=str(exc))
@@ -183,6 +185,7 @@ def confirm(
         start=as_utc(booking.start_at).astimezone(tz),
         end=as_utc(booking.end_at).astimezone(tz),
         edited_fields=run.result["edited_fields"],
+        cleanup_minutes=settings.dock_cleanup_minutes,
     )
 
 
@@ -220,7 +223,10 @@ def schedule(
         ]
         docks.append(DockSchedule(dock_id=dock.dock_id, dock_type=dock.dock_type, bookings=bookings))
 
-    return ScheduleOut(date=day.isoformat(), timezone=gmt_label(open_at), open_at=open_at, close_at=close_at, docks=docks)
+    return ScheduleOut(
+        date=day.isoformat(), timezone=gmt_label(open_at), open_at=open_at, close_at=close_at,
+        cleanup_minutes=settings.dock_cleanup_minutes, docks=docks,
+    )
 
 
 # --- Hàm phụ ----------------------------------------------------------------
@@ -228,6 +234,11 @@ def schedule(
 def hours(settings: Settings) -> tuple[time, time]:
     """Giờ mở và đóng cửa lấy từ cấu hình (DOCK_OPEN, DOCK_CLOSE)."""
     return parse_hhmm(settings.dock_open), parse_hhmm(settings.dock_close)
+
+
+def cleanup(settings: Settings) -> timedelta:
+    """Thời gian dọn cửa sau mỗi xe, lấy từ cấu hình (DOCK_CLEANUP_MINUTES)."""
+    return timedelta(minutes=settings.dock_cleanup_minutes)
 
 
 def get_open_run(db: Session, run_id: int) -> Run:
@@ -291,14 +302,16 @@ def find_slot(db: Session, parsed: DockRequestExtraction, settings: Settings, tz
 
     open_time, close_time = hours(settings)
     open_at, close_at = working_window(slot_request.earliest_start, tz, open_time, close_time)
-    bookings = load_bookings(db, open_at, close_at, tz)
-    return suggest_slot(slot_request, list_docks(db), bookings, tz, open_time, close_time)
+    # Lùi đầu khoảng thêm thời gian dọn: xe kết thúc ngay trước giờ mở cửa vẫn làm cửa bận lúc mở
+    bookings = load_bookings(db, open_at - cleanup(settings), close_at, tz)
+    return suggest_slot(slot_request, list_docks(db), bookings, tz, open_time, close_time, cleanup(settings))
 
 
-def to_slot_out(result: SlotResult) -> SlotOut:
+def to_slot_out(result: SlotResult, cleanup_minutes: int = 0) -> SlotOut:
     """Đổi kết quả thuật toán sang dạng trả về của API."""
     return SlotOut(
         status=result.status,
+        cleanup_minutes=cleanup_minutes,
         dock_id=result.dock_id,
         start=result.start,
         end=result.end,

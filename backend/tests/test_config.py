@@ -1,6 +1,8 @@
 """Test ghép URL kết nối Supabase từ biến môi trường. Không kết nối thật."""
 
-from app.core.config import SQLITE_FALLBACK, build_database_url
+import pytest
+
+from app.core.config import SQLITE_FALLBACK, build_database_url, get_settings, parse_minutes
 
 DB_KEYS = ("DB_HOST", "DB_PORT", "DB_USER", "DB_PASSWORD", "DB_DATABASE", "DB_SSLMODE")
 
@@ -33,3 +35,18 @@ def test_missing_db_env_falls_back_to_sqlite(monkeypatch):
     clear_db_env(monkeypatch)
     monkeypatch.setenv("DB_HOST", "db.example.com")  # thiếu user/password
     assert build_database_url() == SQLITE_FALLBACK
+
+
+def test_cleanup_minutes_from_env(monkeypatch):
+    monkeypatch.setenv("DOCK_CLEANUP_MINUTES", "15")
+    get_settings.cache_clear()
+    try:
+        assert get_settings().dock_cleanup_minutes == 15
+    finally:
+        get_settings.cache_clear()
+
+
+@pytest.mark.parametrize("value", ["-5", "abc", "15.5"])
+def test_bad_cleanup_minutes_is_rejected(value):
+    with pytest.raises(ValueError):
+        parse_minutes(value, "DOCK_CLEANUP_MINUTES")

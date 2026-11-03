@@ -88,6 +88,18 @@ Với mỗi cửa đúng loại:
 
 > A: bận 09:00-11:00; trống sớm nhất 11:00. B: bận 09:30-10:15; trống sớm nhất 10:15. Chọn B 10:15-11:15 (GMT+7) vì sớm nhất.
 
+### Làm thêm: 15 phút dọn cửa
+
+Bật bằng biến `DOCK_CLEANUP_MINUTES=15` trong `.env`. Mặc định là `0`, để ví dụ trong đề vẫn ra B 10:15.
+
+- **Khoảng bận của lịch cũ kéo dài thêm 15 phút** (`merge_intervals(..., cleanup)`). Với lịch trong đề: A bận tới 11:15, B bận tới 10:30, nên kết quả là **B 10:30–11:30**.
+- **Khoảng trống trước một lịch phải đủ `thời lượng + 15 phút`** (`first_gap(..., cleanup)`), vì xe mới xong cũng phải dọn rồi xe sau mới vào được. Ví dụ A trống 11:15–12:20 (65 phút) thì chưa đủ cho xe 60 phút.
+- **Xe cuối ngày chỉ cần rời cửa trước giờ đóng cửa.** Việc dọn được làm sau 18:00.
+- **Lúc xác nhận** (`create_booking`), câu kiểm tra trùng cũng kéo dài cả lịch cũ lẫn lịch mới thêm 15 phút: `start_at < end_mới + 15' AND end_at > start_mới - 15'`. Test `test_cleanup_suggestion_never_conflicts_with_confirm_rule` chạy 300 lịch ngẫu nhiên để chắc rằng giờ đã gợi ý thì lúc xác nhận không bị báo trùng.
+- API trả thêm `cleanup_minutes` trong kết quả gợi ý, lịch đã đặt và lịch ngày. Timeline vẽ đoạn dọn cửa thành ô sọc sau mỗi xe.
+
+Cửa lạnh (phần làm thêm còn lại) đã có từ đầu: yêu cầu `refrigerated` chỉ xét cửa C.
+
 ## 4. Chặn hai người đặt cùng một giờ
 
 Gợi ý chỉ đúng tại lúc tính. Lúc bấm xác nhận, có thể người khác vừa đặt mất giờ đó. Vì vậy `POST /docks/bookings/confirm` **không tin vào gợi ý cũ**, mà kiểm tra theo 3 lớp:
@@ -96,7 +108,7 @@ Gợi ý chỉ đúng tại lúc tính. Lúc bấm xác nhận, có thể ngư�
 |---|---|---|
 | Khóa trong app | [`router.py`](../../backend/app/modules/docks/router.py) | `threading.Lock`: trong một tiến trình, mỗi lúc chỉ một request được đặt lịch. Cần thiết với SQLite, vì SQLite bỏ qua `FOR UPDATE` |
 | Khóa dòng | [`store.py`](../../backend/app/modules/docks/store.py) `create_booking` | `SELECT … FOR UPDATE` trên dòng của cửa, kiểm tra lại trùng giờ trên dữ liệu mới nhất, rồi lưu lịch đặt, trạng thái yêu cầu và lịch sử trong **cùng một transaction** |
-| Ràng buộc database | [`entities.py`](../../backend/app/modules/docks/entities.py), [`schema.sql`](../../backend/supabase/schema.sql) | Trên Supabase: `EXCLUDE USING gist (dock_id WITH =, tstzrange(start_at, end_at, '[)') WITH &&)`. Database tự từ chối hai lịch chồng nhau, kể cả khi chạy nhiều worker |
+| Ràng buộc database | [`entities.py`](../../backend/app/modules/docks/entities.py), [`schema.sql`](../../backend/supabase/schema.sql) | Trên Supabase: `EXCLUDE USING gist (dock_id WITH =, tstzrange(start_at, end_at, '[)') WITH &&)`. Database tự từ chối hai lịch chồng nhau, kể cả khi chạy nhiều worker. Ràng buộc này không biết thời gian dọn cửa: phần dọn cửa do lớp khóa dòng kiểm tra |
 
 Bị trùng thì API trả **409** kèm gợi ý mới tính trên lịch mới nhất:
 
@@ -120,7 +132,7 @@ Lần extract **không** bị đánh dấu là `rejected`, nên người dùng b
 | `POST /docks/requests/extract` | Sinh mã yêu cầu, GenAI đọc email, code kiểm tra, lưu lịch sử. **Chưa** tìm giờ | 422 `received_at` thiếu múi giờ |
 | `POST /docks/slots/suggest` | Kiểm tra lại bản đã sửa, chạy thuật toán trên lịch mới nhất. **Chưa** đặt | 400 còn lỗi (thiếu thời lượng, sai mã), 404 không thấy run, 409 đã đặt rồi |
 | `POST /docks/bookings/confirm` | Nhận `run_id`, bản đã sửa, `dock_id`, `start`. Kiểm tra lại rồi lưu | 400 ngoài giờ mở cửa, sớm hơn giờ xe đến hoặc sai loại cửa; 409 trùng giờ (kèm gợi ý mới) hoặc đã đặt; 422 `start` thiếu múi giờ |
-| `GET /docks/schedule?date=YYYY-MM-DD` | Lịch một ngày của các cửa, kèm giờ mở, đóng cửa và nhãn múi giờ | |
+| `GET /docks/schedule?date=YYYY-MM-DD` | Lịch một ngày của các cửa, kèm giờ mở, đóng cửa, nhãn múi giờ và số phút dọn cửa | |
 | `GET /docks/samples` | Email mẫu cho chế độ mock | |
 | `GET /runs?module=docks` | Lịch sử xử lý | |
 
@@ -156,11 +168,11 @@ Chạy `cd backend && myenv/bin/python -m pytest -q`. Thuật toán được tes
 
 | File | Số test | Nội dung |
 |---|---|---|
-| [`test_docks_algo.py`](../../backend/tests/test_docks_algo.py) | 59 | Thuật toán thuần, so với brute force trên 30 lịch ngẫu nhiên, 10.000 lịch dưới 1 giây |
+| [`test_docks_algo.py`](../../backend/tests/test_docks_algo.py) | 63 | Thuật toán thuần, so với brute force trên 30 lịch ngẫu nhiên, 10.000 lịch dưới 1 giây, thời gian dọn cửa |
 | [`test_docks_validation.py`](../../backend/tests/test_docks_validation.py) | 28 | Mẫu JSON, kiểm tra 2 lớp, múi giờ |
 | [`test_docks_extractor.py`](../../backend/tests/test_docks_extractor.py) | 22 | GenAI (mock), prompt, từng mẫu trong `samples/docks.json` |
 | [`test_docks_store.py`](../../backend/tests/test_docks_store.py) | 18 | Database: seed, mã tuần tự, khóa, trùng giờ, DDL có `EXCLUDE` |
-| [`test_docks_api.py`](../../backend/tests/test_docks_api.py) | 24 | Toàn bộ API bằng `TestClient`, có test 2 thread xác nhận cùng lúc |
+| [`test_docks_api.py`](../../backend/tests/test_docks_api.py) | 27 | Toàn bộ API bằng `TestClient`, có test 2 thread xác nhận cùng lúc và test bật 15 phút dọn cửa |
 
 ### Đối chiếu phần "Tự kiểm tra" của đề
 
@@ -175,6 +187,7 @@ Chạy `cd backend && myenv/bin/python -m pytest -q`. Thuật toán được tes
 | Hết chỗ | `test_fully_booked_day_is_no_slot`, `test_arriving_after_closing_is_no_slot`, `test_after_closing_has_no_slot` |
 | Hai người cùng đặt một giờ | `test_second_person_gets_409_with_new_suggestion`, `test_two_people_confirming_at_the_same_time`, `test_postgres_ddl_has_exclusion_constraint` |
 | Làm thêm: cửa lạnh | `test_refrigerated_request_only_uses_cold_dock`, `test_refrigerated_goes_to_dock_c` |
+| Làm thêm: 15 phút dọn cửa, khoảng bận tính cả thời gian dọn | `test_cleanup_buffer_extends_busy_blocks`, `test_gap_must_fit_cleanup_before_next_booking`, `test_cleanup_suggestion_never_conflicts_with_confirm_rule`, `test_cleanup_buffer_makes_touching_booking_conflict`, `test_cleanup_moves_example_to_b_at_10_30`, `test_cleanup_confirm_right_after_previous_truck_is_409`, `test_cleanup_next_truck_waits_for_cleanup` |
 
 ## 8. Dữ liệu mẫu (chế độ mock)
 
@@ -205,6 +218,10 @@ Chạy `cd backend && myenv/bin/python -m pytest -q`. Thuật toán được tes
 
 ![Trùng giờ, gợi ý mới](images/03-trung-gio-409.jpg)
 
+**Làm thêm, 15 phút dọn cửa (`DOCK_CLEANUP_MINUTES=15`):** R001 đã đặt B 10:30–11:30, nên B bận tới 11:45. A bận tới 11:15, vì vậy xe tiếp theo được gợi ý A 11:15–12:15. Ô sọc là thời gian dọn cửa sau mỗi xe.
+
+![15 phút dọn cửa](images/04-don-cua.jpg)
+
 ## 10. Giới hạn và các quyết định
 
 - **Giờ mở cửa 08:00–18:00** cấu hình bằng `DOCK_OPEN`, `DOCK_CLOSE`, áp dụng cho mọi ngày. Chưa có lịch nghỉ hay ngày lễ.
@@ -212,4 +229,5 @@ Chạy `cd backend && myenv/bin/python -m pytest -q`. Thuật toán được tes
 - **Người dùng chỉ đặt theo gợi ý trên giao diện.** API vẫn cho chọn cửa và giờ khác, miễn là còn trống, đúng loại cửa và nằm trong giờ mở cửa.
 - **Khóa trong app chỉ có tác dụng trong 1 tiến trình.** Chạy nhiều worker trên Supabase thì khóa dòng và ràng buộc `EXCLUDE` vẫn bảo vệ. Trên SQLite thì chỉ nên chạy 1 worker.
 - **Chế độ mock chỉ đọc được email có trong `samples/`.**
-- **15 phút dọn cửa** (phần làm thêm): thuật toán và `create_booking` đã nhận tham số `cleanup`, có test ở tầng thuật toán và database, nhưng API chưa bật. Sẽ làm ở Phần 8.
+- **Thời gian dọn cửa giống nhau cho mọi cửa và mọi xe** (`DOCK_CLEANUP_MINUTES`). Chưa có thời gian dọn riêng cho từng loại cửa, ví dụ cửa lạnh cần dọn lâu hơn.
+- **Đổi `DOCK_CLEANUP_MINUTES` không làm thay đổi lịch đã đặt.** Số phút mới chỉ áp dụng cho các lần gợi ý và xác nhận sau đó.

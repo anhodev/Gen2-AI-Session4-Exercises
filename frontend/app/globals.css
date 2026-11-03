@@ -172,11 +172,13 @@ code { font-family:ui-monospace, SFMono-Regular, Menlo, monospace; font-size:.92
 .block.seed { background:#e3e0ea; color:#5e5a66; border:1px solid #fff; }
 .block.booked { background:var(--purple); color:white; border:1px solid #fff; }
 .block.suggested { background:#e3f8ed; color:#1f7a4d; border:2px dashed #3aa86f; }
+.block.cleanup { background:repeating-linear-gradient(135deg, #f3e3c4 0 4px, #fbf3e3 4px 8px); border:1px solid #fff; padding:0; }
 .timeline-legend { display:flex; flex-wrap:wrap; gap:14px; font-size:11px; color:var(--muted); align-items:center; padding-top:4px; }
 .timeline-legend i { display:inline-block; width:12px; height:12px; border-radius:3px; vertical-align:-2px; margin-right:4px; }
 .timeline-legend i.seed { background:#e3e0ea; }
 .timeline-legend i.booked { background:var(--purple); }
 .timeline-legend i.suggested { background:#e3f8ed; border:2px dashed #3aa86f; }
+.timeline-legend i.cleanup { background:repeating-linear-gradient(135deg, #f3e3c4 0 3px, #fbf3e3 3px 6px); }
 .timeline-tz { margin-left:auto; font-weight:700; color:#55515c; }
 
 .spin { animation:spin .8s linear infinite; }

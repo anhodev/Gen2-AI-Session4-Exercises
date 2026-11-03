@@ -23,6 +23,7 @@ class Settings:
     app_timezone: str = "Asia/Ho_Chi_Minh"  # múi giờ của app (GMT+7), dùng khi email không ghi múi giờ
     dock_open: str = "08:00"   # Bài 02: giờ mở cửa kho
     dock_close: str = "18:00"  # Bài 02: giờ đóng cửa kho
+    dock_cleanup_minutes: int = 0  # Bài 02: số phút dọn cửa sau mỗi xe, 0 = không dọn
 
     @property
     def use_mock(self) -> bool:
@@ -68,4 +69,21 @@ def get_settings() -> Settings:
         app_timezone=os.getenv("APP_TIMEZONE", "Asia/Ho_Chi_Minh"),
         dock_open=os.getenv("DOCK_OPEN", "08:00"),
         dock_close=os.getenv("DOCK_CLOSE", "18:00"),
+        dock_cleanup_minutes=parse_minutes(os.getenv("DOCK_CLEANUP_MINUTES", "0"), "DOCK_CLEANUP_MINUTES"),
     )
+
+
+def parse_minutes(value: str, name: str) -> int:
+    """
+    Đọc số phút từ biến môi trường.
+
+    Raises:
+        ValueError: Không phải số nguyên, hoặc số âm.
+    """
+    try:
+        minutes = int(value.strip())
+    except ValueError:
+        raise ValueError(f"{name} phải là số phút (số nguyên), đang là '{value}'")
+    if minutes < 0:
+        raise ValueError(f"{name} không được âm, đang là {minutes}")
+    return minutes

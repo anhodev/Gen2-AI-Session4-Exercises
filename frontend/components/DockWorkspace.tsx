@@ -271,6 +271,7 @@ export default function DockWorkspace({ llmMode }: { llmMode: string }) {
                       <strong>Đã đặt {booking.request_id}: Cửa {booking.dock_id} {clock(booking.start)}–{clock(booking.end)} ({gmtLabel(booking.start)})</strong>
                       <span>
                         Ngày {booking.start.slice(0, 10)}{booking.carrier ? ` · ${booking.carrier}` : ""}.
+                        {booking.cleanup_minutes > 0 && ` Cửa còn bận tới ${clock(addMinutes(booking.end, booking.cleanup_minutes))} để dọn.`}
                         {booking.edited_fields.length > 0 && ` Đã sửa: ${booking.edited_fields.join(", ")}.`}
                       </span>
                     </div>
@@ -307,7 +308,11 @@ export default function DockWorkspace({ llmMode }: { llmMode: string }) {
         <PanelHeader
           step={3}
           title={`Lịch các cửa ngày ${schedule?.date ?? day} (${tz})`}
-          subtitle="Khoảng [bắt đầu, kết thúc): xe kết thúc 10:00 thì xe khác vào được đúng 10:00. Ô nét đứt là gợi ý chưa đặt."
+          subtitle={
+            schedule?.cleanup_minutes
+              ? `Sau mỗi xe cửa cần ${schedule.cleanup_minutes} phút dọn (ô sọc): xe kết thúc 10:00 thì xe sau vào được từ ${clock(addMinutes("2000-01-01T10:00:00", schedule.cleanup_minutes))}. Ô nét đứt là gợi ý chưa đặt.`
+              : "Khoảng [bắt đầu, kết thúc): xe kết thúc 10:00 thì xe khác vào được đúng 10:00. Ô nét đứt là gợi ý chưa đặt."
+          }
           action={
             <div className="toolbar">
               <label>Ngày <input type="date" value={day} onChange={(e) => e.target.value && setDay(e.target.value)} /></label>
@@ -355,6 +360,13 @@ const minutesOf = (iso: string) => {
   return h * 60 + m;
 };
 
+/** Cộng thêm số phút, giữ nguyên phần ngày và múi giờ: "…T10:15:00+07:00" + 15 -> "…T10:30:00+07:00". */
+function addMinutes(iso: string, minutes: number): string {
+  const total = minutesOf(iso) + minutes;
+  const hhmm = `${String(Math.floor(total / 60) % 24).padStart(2, "0")}:${String(total % 60).padStart(2, "0")}`;
+  return iso.slice(0, 11) + hhmm + iso.slice(16);
+}
+
 function Timeline({ schedule, slot }: { schedule: ScheduleOut; slot: SlotOut | null }) {
   const open = minutesOf(schedule.open_at);
   const close = minutesOf(schedule.close_at);
@@ -364,6 +376,16 @@ function Timeline({ schedule, slot }: { schedule: ScheduleOut; slot: SlotOut | n
     const s = Math.max(open, minutesOf(start));
     const e = Math.min(close, end.slice(0, 10) > start.slice(0, 10) ? 24 * 60 : minutesOf(end));
     return { left: `${((s - open) / span) * 100}%`, width: `${(Math.max(e - s, 0) / span) * 100}%` };
+  };
+  // Đoạn dọn cửa ngay sau giờ kết thúc, cắt ở giờ đóng cửa
+  const cleanupPos = (end: string) => {
+    const s = minutesOf(end);
+    const e = Math.min(close, s + schedule.cleanup_minutes);
+    return e > s ? { left: `${((s - open) / span) * 100}%`, width: `${((e - s) / span) * 100}%` } : null;
+  };
+  const cleanupBlock = (end: string, key: string) => {
+    const style = schedule.cleanup_minutes > 0 ? cleanupPos(end) : null;
+    return style && <div key={key} className="block cleanup" style={style} title={`Dọn cửa ${schedule.cleanup_minutes} phút`} />;
   };
   const hours = Array.from({ length: Math.floor(span / 60) + 1 }, (_, i) => open + i * 60);
   const showSlot = slot?.status === "ok" && slot.start && slot.end && slot.start.slice(0, 10) === schedule.date;
@@ -383,6 +405,7 @@ function Timeline({ schedule, slot }: { schedule: ScheduleOut; slot: SlotOut | n
           <div className="timeline-label"><strong>Cửa {dock.dock_id}</strong><small>{dock.dock_type}</small></div>
           <div className="timeline-track">
             {hours.map((m) => <i key={m} style={{ left: `${((m - open) / span) * 100}%` }} />)}
+            {dock.bookings.map((b, i) => cleanupBlock(b.end, `c${i}`))}
             {dock.bookings.map((b, i) => (
               <div
                 key={i}
@@ -393,6 +416,7 @@ function Timeline({ schedule, slot }: { schedule: ScheduleOut; slot: SlotOut | n
                 <span>{b.request_id ?? `${clock(b.start)}–${clock(b.end)}`}</span>
               </div>
             ))}
+            {showSlot && slot!.dock_id === dock.dock_id && cleanupBlock(slot!.end!, "c-slot")}
             {showSlot && slot!.dock_id === dock.dock_id && (
               <div className="block suggested" style={pos(slot!.start!, slot!.end!)} title={`Gợi ý ${clock(slot!.start!)}–${clock(slot!.end!)}`}>
                 <span>gợi ý {clock(slot!.start!)}</span>
@@ -405,6 +429,7 @@ function Timeline({ schedule, slot }: { schedule: ScheduleOut; slot: SlotOut | n
         <span><i className="seed" /> lịch có sẵn</span>
         <span><i className="booked" /> đã đặt qua app</span>
         <span><i className="suggested" /> gợi ý chưa đặt</span>
+        {schedule.cleanup_minutes > 0 && <span><i className="cleanup" /> dọn cửa {schedule.cleanup_minutes} phút</span>}
         <span className="timeline-tz">Giờ mở cửa {clock(schedule.open_at)}–{clock(schedule.close_at)} ({schedule.timezone})</span>
       </div>
     </div>

@@ -135,6 +135,51 @@ def test_cleanup_buffer_extends_busy_blocks():
     # Có 15 phút dọn cửa: A bận tới 11:15, B bận tới 10:30 -> B 10:30
     result = suggest(at(9, 0), 60, cleanup=timedelta(minutes=15))
     assert (result.dock_id, result.start) == ("B", at(10, 30))
+    assert "15 phút dọn cửa" in result.reason
+
+
+CLEANUP = timedelta(minutes=15)
+
+
+def test_gap_must_fit_cleanup_before_next_booking():
+    # A trống 11:15-12:20 (65 phút): đủ xe 60 phút nhưng không đủ thêm 15 phút dọn -> phải chờ tới 13:15
+    bookings = [book("A", 9, 0, 11, 0), book("A", 12, 20, 13, 0), book("B", 8, 0, 18, 0)]
+    result = suggest(at(11, 0), 60, bookings, cleanup=CLEANUP)
+    assert (result.dock_id, result.start) == ("A", at(13, 15))
+
+
+def test_gap_exactly_duration_plus_cleanup_is_ok():
+    # A trống 11:15-12:30 = đúng 60 + 15 phút -> nhận được
+    bookings = [book("A", 9, 0, 11, 0), book("A", 12, 30, 13, 0), book("B", 8, 0, 18, 0)]
+    result = suggest(at(11, 0), 60, bookings, cleanup=CLEANUP)
+    assert (result.dock_id, result.start, result.end) == ("A", at(11, 15), at(12, 15))
+
+
+def test_last_truck_can_end_at_closing_time_with_cleanup():
+    # Xe cuối ngày chỉ cần rời cửa đúng 18:00, dọn sau giờ đóng cửa
+    bookings = [book("A", 8, 0, 16, 45), book("B", 8, 0, 18, 0)]
+    result = suggest(at(8, 0), 60, bookings, cleanup=CLEANUP)
+    assert (result.dock_id, result.start, result.end) == ("A", at(17, 0), at(18, 0))
+
+
+def test_cleanup_suggestion_never_conflicts_with_confirm_rule():
+    # Gợi ý luôn qua được luật kiểm tra lúc xác nhận (store.create_booking):
+    # lịch cũ và lịch mới đều kéo dài thêm cleanup, không được chồng nhau
+    rng = random.Random(15)
+    for _ in range(300):
+        bookings = []
+        for dock in ("A", "B"):
+            for _ in range(rng.randint(0, 6)):
+                start = rng.randrange(8 * 60, 18 * 60 - 15, 5)
+                end = min(start + rng.randrange(15, 120, 5), 18 * 60)
+                bookings.append(Booking(dock, at(start // 60, start % 60), at(end // 60, end % 60)))
+        minutes = rng.randrange(15, 120, 5)
+        result = suggest(at(8, 0) + timedelta(minutes=rng.randrange(0, 600, 5)), minutes, bookings, cleanup=CLEANUP)
+        if result.status != "ok":
+            continue
+        for b in bookings:
+            if b.dock_id == result.dock_id:
+                assert not (b.start < result.end + CLEANUP and b.end > result.start - CLEANUP)
 
 
 def brute_force(bookings: list[Booking], earliest: datetime, minutes: int):

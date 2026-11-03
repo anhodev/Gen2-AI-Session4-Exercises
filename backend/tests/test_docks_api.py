@@ -14,8 +14,9 @@ def sample(label_start: str) -> dict:
     return next(s for s in SAMPLES if s["label"].startswith(label_start))
 
 
-def make_client(db_url: str) -> TestClient:
-    return TestClient(create_app(Settings(database_url=db_url, mock_llm=True)))
+def make_client(db_url: str, cleanup_minutes: int = 0) -> TestClient:
+    settings = Settings(database_url=db_url, mock_llm=True, dock_cleanup_minutes=cleanup_minutes)
+    return TestClient(create_app(settings))
 
 
 @pytest.fixture
@@ -27,6 +28,13 @@ def db_url(tmp_path):
 def client(db_url):
     # "with" để chạy lifespan: tạo bảng + seed cửa kho
     with make_client(db_url) as c:
+        yield c
+
+
+@pytest.fixture
+def cleanup_client(db_url):
+    # Phần làm thêm: 15 phút dọn cửa sau mỗi xe (DOCK_CLEANUP_MINUTES=15)
+    with make_client(db_url, cleanup_minutes=15) as c:
         yield c
 
 
@@ -113,6 +121,7 @@ def test_refrigerated_goes_to_dock_c(client):
 def test_schedule_shows_timezone_and_hours(client):
     schedule = client.get("/docks/schedule?date=2026-10-21").json()
     assert schedule["timezone"] == "GMT+7"
+    assert schedule["cleanup_minutes"] == 0  # mặc định không dọn cửa, đúng ví dụ trong đề
     assert (schedule["open_at"], schedule["close_at"]) == ("2026-10-21T08:00:00+07:00", "2026-10-21T18:00:00+07:00")
     assert [(d["dock_id"], len(d["bookings"])) for d in schedule["docks"]] == [("A", 2), ("B", 1), ("C", 1)]
 
@@ -245,3 +254,31 @@ def test_two_people_confirming_at_the_same_time(client):
     assert codes == [200, 409]
     assert [b["request_id"] for b in dock_bookings(client, "B")].count(None) == 1
     assert len(dock_bookings(client, "B")) == 2
+
+
+# --- Làm thêm: 15 phút dọn cửa ----------------------------------------------
+
+def test_cleanup_moves_example_to_b_at_10_30(cleanup_client):
+    # B bận 09:30-10:15 + 15 phút dọn -> 10:30; A bận tới 11:00 + 15 -> 11:15
+    slot = suggest(cleanup_client, extract(cleanup_client, "R01")).json()
+    assert (slot["dock_id"], slot["start"], slot["end"]) == ("B", "2026-10-21T10:30:00+07:00", "2026-10-21T11:30:00+07:00")
+    assert slot["cleanup_minutes"] == 15
+    assert "15 phút dọn cửa" in slot["reason"]
+    assert cleanup_client.get("/docks/schedule?date=2026-10-21").json()["cleanup_minutes"] == 15
+
+
+def test_cleanup_confirm_right_after_previous_truck_is_409(cleanup_client):
+    # 10:15 sát giờ xe trước rời B, chưa kịp dọn -> 409 kèm gợi ý mới B 10:30
+    response = confirm(cleanup_client, extract(cleanup_client, "R01"), "B", "2026-10-21T10:15:00+07:00")
+    assert response.status_code == 409
+    suggestion = response.json()["detail"]["suggestion"]
+    assert (suggestion["dock_id"], suggestion["start"]) == ("B", "2026-10-21T10:30:00+07:00")
+
+
+def test_cleanup_next_truck_waits_for_cleanup(cleanup_client):
+    first = confirm(cleanup_client, extract(cleanup_client, "R01"), "B", "2026-10-21T10:30:00+07:00")
+    assert first.status_code == 200, first.text
+    assert first.json()["cleanup_minutes"] == 15
+    # B bận tới 11:30 + 15 = 11:45, A trống từ 11:15 -> A 11:15
+    slot = suggest(cleanup_client, extract(cleanup_client, "R01")).json()
+    assert (slot["dock_id"], slot["start"]) == ("A", "2026-10-21T11:15:00+07:00")

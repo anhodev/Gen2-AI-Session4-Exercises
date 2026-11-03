@@ -63,6 +63,7 @@ Các giá trị trong `backend/.env`:
 | `DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASSWORD`, `DB_DATABASE`, `DB_SSLMODE` | Kết nối Supabase. Để trống `DB_HOST` thì dùng SQLite tại `backend/data/app.db` |
 | `APP_TIMEZONE` | Múi giờ hiển thị kết quả và múi giờ của kho, mặc định `Asia/Ho_Chi_Minh` (GMT+7) |
 | `DOCK_OPEN`, `DOCK_CLOSE` | Giờ mở và đóng cửa kho (Bài 02), mặc định `08:00`, `18:00` |
+| `DOCK_CLEANUP_MINUTES` | Số phút dọn cửa sau mỗi xe (Bài 02, làm thêm). Mặc định `0`, đặt `15` để bật |
 | `FRONTEND_ORIGIN` | Địa chỉ frontend được phép gọi API (CORS) |
 
 **Supabase** (tùy chọn):
@@ -94,7 +95,7 @@ cd backend
 myenv/bin/python -m pytest -q
 ```
 
-Hiện có 260 test, chạy trong khoảng 1 giây. Test không gọi GenAI và không cần Supabase (dùng mock và SQLite tạm).
+Hiện có 271 test, chạy trong khoảng 1 giây. Test không gọi GenAI và không cần Supabase (dùng mock và SQLite tạm).
 
 ## Dữ liệu
 

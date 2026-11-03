@@ -145,9 +145,20 @@ def merge_intervals(intervals: list[Interval], cleanup: timedelta = timedelta(0)
     return merged
 
 
-def first_gap(busy: list[Interval], earliest: datetime, duration: timedelta, open_at: datetime, close_at: datetime) -> datetime | None:
+def first_gap(
+    busy: list[Interval],
+    earliest: datetime,
+    duration: timedelta,
+    open_at: datetime,
+    close_at: datetime,
+    cleanup: timedelta = timedelta(0),
+) -> datetime | None:
     """
     Tìm giờ bắt đầu sớm nhất còn trống đủ `duration`. O(n).
+
+    Có thời gian dọn cửa thì khoảng trống trước một lịch phải đủ `duration + cleanup`:
+    xe mới xong còn phải dọn cửa rồi xe sau mới vào. Riêng xe cuối ngày chỉ cần
+    rời cửa trước giờ đóng cửa, việc dọn có thể làm sau giờ đóng.
 
     Args:
         busy (list[Interval]): Khoảng bận đã gộp và sắp xếp (kết quả merge_intervals).
@@ -155,6 +166,7 @@ def first_gap(busy: list[Interval], earliest: datetime, duration: timedelta, ope
         duration (timedelta): Thời gian cần dùng cửa.
         open_at (datetime): Giờ mở cửa trong ngày.
         close_at (datetime): Giờ đóng cửa; xe phải rời cửa trước hoặc đúng giờ này.
+        cleanup (timedelta, optional): Thời gian dọn cửa sau xe mới. Defaults to 0.
 
     Returns:
         datetime | None: Giờ bắt đầu, None nếu không còn chỗ trong ngày.
@@ -163,8 +175,8 @@ def first_gap(busy: list[Interval], earliest: datetime, duration: timedelta, ope
     for interval in busy:
         if interval.end <= cursor:
             continue  # khoảng bận đã qua
-        if interval.start - cursor >= duration:
-            break  # khoảng trống trước khoảng bận này đủ dài
+        if interval.start - cursor >= duration + cleanup:
+            break  # khoảng trống trước khoảng bận này đủ cho xe và thời gian dọn
         cursor = max(cursor, interval.end)  # phải chờ hết khoảng bận
     return cursor if cursor + duration <= close_at else None
 
@@ -220,7 +232,7 @@ def suggest_slot(
     checks = []
     for dock in candidates:
         busy = merge_intervals(by_dock[dock.dock_id], cleanup)
-        free_from = first_gap(busy, earliest, request.duration, open_at, close_at)
+        free_from = first_gap(busy, earliest, request.duration, open_at, close_at, cleanup)
         checks.append(DockCheck(dock.dock_id, busy, free_from))
 
     # Giờ sớm nhất trước, cùng giờ thì mã cửa đứng trước theo alphabet
@@ -234,10 +246,10 @@ def suggest_slot(
         )
     best = min(available, key=lambda c: (c.free_from, c.dock_id))
     end = best.free_from + request.duration
-    return SlotResult("ok", best.dock_id, best.free_from, end, explain(best, checks, request), checks)
+    return SlotResult("ok", best.dock_id, best.free_from, end, explain(best, checks, request, cleanup), checks)
 
 
-def explain(best: DockCheck, checks: list[DockCheck], request: SlotRequest) -> str:
+def explain(best: DockCheck, checks: list[DockCheck], request: SlotRequest, cleanup: timedelta = timedelta(0)) -> str:
     """
     Giải thích vì sao chọn cửa và giờ này.
 
@@ -255,7 +267,10 @@ def explain(best: DockCheck, checks: list[DockCheck], request: SlotRequest) -> s
     same_time = [c.dock_id for c in checks if c.free_from == best.free_from and c.dock_id != best.dock_id]
     if same_time:
         reason += f"; cùng giờ với {', '.join(same_time)} nên chọn mã cửa đứng trước"
-    return ". ".join(parts) + ". " + reason + "."
+    text = ". ".join(parts) + ". " + reason + "."
+    if cleanup:
+        text += f" Khoảng bận đã gồm {int(cleanup.total_seconds() // 60)} phút dọn cửa sau mỗi xe."
+    return text
 
 
 def fmt(value: datetime) -> str:
