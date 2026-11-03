@@ -1,0 +1,406 @@
+[
+  {
+    "label": "Mẫu 1 - Ví dụ trong đề (A, B, C, D)",
+    "note": "A và B đều bắt đầu được ngay, chọn A trước vì mã đứng trước -> A → B → C → D (T01 → T02 → T03 → T04)",
+    "input": "Biên bản họp dự án Checkout - 21/10/2026\n- Product chốt yêu cầu API.\n- Design duyệt thiết kế UI.\n- Engineering tích hợp frontend. Sau khi chốt API mới tích hợp frontend. Duyệt UI trước khi tích hợp.\n- QA kiểm thử end-to-end. Kiểm thử sau khi tích hợp.",
+    "expect_can_order": true,
+    "llm_output": {
+      "tasks": [
+        {
+          "id": "A",
+          "title": "Chốt yêu cầu API",
+          "owner": "Product"
+        },
+        {
+          "id": "B",
+          "title": "Duyệt thiết kế UI",
+          "owner": "Design"
+        },
+        {
+          "id": "C",
+          "title": "Tích hợp frontend",
+          "owner": "Engineering"
+        },
+        {
+          "id": "D",
+          "title": "Kiểm thử end-to-end",
+          "owner": "QA"
+        }
+      ],
+      "dependencies": [
+        {
+          "before": "A",
+          "after": "C",
+          "evidence": "Sau khi chốt API mới tích hợp frontend"
+        },
+        {
+          "before": "B",
+          "after": "C",
+          "evidence": "Duyệt UI trước khi tích hợp"
+        },
+        {
+          "before": "C",
+          "after": "D",
+          "evidence": "Kiểm thử sau khi tích hợp"
+        }
+      ]
+    }
+  },
+  {
+    "label": "Mẫu 2 - Thêm D → A (vòng chờ nhau)",
+    "note": "Biên bản thêm câu 'chốt API sau khi QA kiểm thử xong' -> vòng A → C → D → A, phải báo cycle_detected",
+    "input": "Biên bản họp dự án Checkout - 21/10/2026\n- Product chốt yêu cầu API.\n- Design duyệt thiết kế UI.\n- Engineering tích hợp frontend. Sau khi chốt API mới tích hợp frontend. Duyệt UI trước khi tích hợp.\n- QA kiểm thử end-to-end. Kiểm thử sau khi tích hợp.\n- Product chỉ chốt API sau khi QA kiểm thử xong.",
+    "expect_can_order": true,
+    "llm_output": {
+      "tasks": [
+        {
+          "id": "A",
+          "title": "Chốt yêu cầu API",
+          "owner": "Product"
+        },
+        {
+          "id": "B",
+          "title": "Duyệt thiết kế UI",
+          "owner": "Design"
+        },
+        {
+          "id": "C",
+          "title": "Tích hợp frontend",
+          "owner": "Engineering"
+        },
+        {
+          "id": "D",
+          "title": "Kiểm thử end-to-end",
+          "owner": "QA"
+        }
+      ],
+      "dependencies": [
+        {
+          "before": "A",
+          "after": "C",
+          "evidence": "Sau khi chốt API mới tích hợp frontend"
+        },
+        {
+          "before": "B",
+          "after": "C",
+          "evidence": "Duyệt UI trước khi tích hợp"
+        },
+        {
+          "before": "C",
+          "after": "D",
+          "evidence": "Kiểm thử sau khi tích hợp"
+        },
+        {
+          "before": "D",
+          "after": "A",
+          "evidence": "Product chỉ chốt API sau khi QA kiểm thử xong"
+        }
+      ]
+    }
+  },
+  {
+    "label": "Mẫu 3 - Không có quan hệ nào",
+    "note": "Ba việc độc lập -> dependencies rỗng, thứ tự chỉ theo mã",
+    "input": "Họp nhóm marketing tuần 43:\nLan viết bài blog giới thiệu sản phẩm. Minh làm video demo. Hà cập nhật landing page.\nCác việc này độc lập, ai xong trước cũng được.",
+    "expect_can_order": true,
+    "llm_output": {
+      "tasks": [
+        {
+          "id": "A",
+          "title": "Viết bài blog giới thiệu sản phẩm",
+          "owner": "Lan"
+        },
+        {
+          "id": "B",
+          "title": "Làm video demo",
+          "owner": "Minh"
+        },
+        {
+          "id": "C",
+          "title": "Cập nhật landing page",
+          "owner": "Hà"
+        }
+      ],
+      "dependencies": []
+    }
+  },
+  {
+    "label": "Mẫu 4 - Quan hệ ghi lặp",
+    "note": "Biên bản nhắc lại một quan hệ 2 lần, GenAI ghi 2 dòng -> chỉ tính một lần, có cảnh báo",
+    "input": "Họp DevOps:\n1. Dựng môi trường staging (DevOps).\n2. Deploy thử bản 2.0 (Backend).\nPhải có môi trường staging rồi mới deploy thử.\nCuối buổi nhắc lại: staging xong thì mới deploy thử.",
+    "expect_can_order": true,
+    "llm_output": {
+      "tasks": [
+        {
+          "id": "1",
+          "title": "Dựng môi trường staging",
+          "owner": "DevOps"
+        },
+        {
+          "id": "2",
+          "title": "Deploy thử bản 2.0",
+          "owner": "Backend"
+        }
+      ],
+      "dependencies": [
+        {
+          "before": "1",
+          "after": "2",
+          "evidence": "Phải có môi trường staging rồi mới deploy thử"
+        },
+        {
+          "before": "1",
+          "after": "2",
+          "evidence": "staging xong thì mới deploy thử"
+        }
+      ]
+    }
+  },
+  {
+    "label": "Mẫu 5 - Biên bản đánh số sẵn, thiếu người phụ trách",
+    "note": "GenAI dùng mã 1, 2, 3 của biên bản; backend đổi sang T01, T02, T03. Việc 2 không ghi ai làm -> owner null",
+    "input": "Kế hoạch ra mắt app mobile:\n(1) Hoàn thiện tính năng đăng nhập - Mobile team.\n(2) Viết tài liệu hướng dẫn sử dụng.\n(3) Gửi bản build lên App Store - Mobile team, làm sau khi việc 1 xong.\nViệc 2 không phụ thuộc việc nào.",
+    "expect_can_order": true,
+    "llm_output": {
+      "tasks": [
+        {
+          "id": "1",
+          "title": "Hoàn thiện tính năng đăng nhập",
+          "owner": "Mobile team"
+        },
+        {
+          "id": "2",
+          "title": "Viết tài liệu hướng dẫn sử dụng",
+          "owner": null
+        },
+        {
+          "id": "3",
+          "title": "Gửi bản build lên App Store",
+          "owner": "Mobile team"
+        }
+      ],
+      "dependencies": [
+        {
+          "before": "1",
+          "after": "3",
+          "evidence": "làm sau khi việc 1 xong"
+        }
+      ]
+    }
+  },
+  {
+    "label": "Mẫu 6 - Ra mắt thanh toán QR (7 việc)",
+    "note": "Kế hoạch nhiều nhánh: có việc bắt đầu ngay (A, D), có việc chờ 2 việc khác (E, F, G)",
+    "input": "Biên bản họp ra mắt thanh toán QR - 28/10/2026\nProduct chốt yêu cầu thanh toán QR trong tuần này.\nDesign thiết kế màn hình QR sau khi chốt yêu cầu.\nBackend làm API tạo mã QR, cũng chờ chốt yêu cầu.\nLegal ký hợp đồng với ngân hàng, việc này làm song song được ngay.\nFrontend làm giao diện QR khi có thiết kế. Frontend cũng cần API tạo mã QR xong mới ghép được.\nBackend kết nối cổng ngân hàng sau khi ký hợp đồng. Kết nối cổng cần API tạo mã QR chạy ổn trước.\nQA kiểm thử toàn luồng khi giao diện và kết nối ngân hàng đều xong.",
+    "expect_can_order": true,
+    "llm_output": {
+      "tasks": [
+        {
+          "id": "A",
+          "title": "Chốt yêu cầu thanh toán QR",
+          "owner": "Product"
+        },
+        {
+          "id": "B",
+          "title": "Thiết kế màn hình QR",
+          "owner": "Design"
+        },
+        {
+          "id": "C",
+          "title": "Làm API tạo mã QR",
+          "owner": "Backend"
+        },
+        {
+          "id": "D",
+          "title": "Ký hợp đồng với ngân hàng",
+          "owner": "Legal"
+        },
+        {
+          "id": "E",
+          "title": "Làm giao diện QR",
+          "owner": "Frontend"
+        },
+        {
+          "id": "F",
+          "title": "Kết nối cổng ngân hàng",
+          "owner": "Backend"
+        },
+        {
+          "id": "G",
+          "title": "Kiểm thử toàn luồng",
+          "owner": "QA"
+        }
+      ],
+      "dependencies": [
+        {
+          "before": "A",
+          "after": "B",
+          "evidence": "Design thiết kế màn hình QR sau khi chốt yêu cầu"
+        },
+        {
+          "before": "A",
+          "after": "C",
+          "evidence": "Backend làm API tạo mã QR, cũng chờ chốt yêu cầu"
+        },
+        {
+          "before": "B",
+          "after": "E",
+          "evidence": "Frontend làm giao diện QR khi có thiết kế"
+        },
+        {
+          "before": "C",
+          "after": "E",
+          "evidence": "Frontend cũng cần API tạo mã QR xong mới ghép được"
+        },
+        {
+          "before": "D",
+          "after": "F",
+          "evidence": "Backend kết nối cổng ngân hàng sau khi ký hợp đồng"
+        },
+        {
+          "before": "C",
+          "after": "F",
+          "evidence": "Kết nối cổng cần API tạo mã QR chạy ổn trước"
+        },
+        {
+          "before": "E",
+          "after": "G",
+          "evidence": "QA kiểm thử toàn luồng khi giao diện và kết nối ngân hàng đều xong"
+        },
+        {
+          "before": "F",
+          "after": "G",
+          "evidence": "QA kiểm thử toàn luồng khi giao diện và kết nối ngân hàng đều xong"
+        }
+      ]
+    }
+  },
+  {
+    "label": "Mẫu 7 - [Lỗi] Quan hệ trỏ tới mã lạ",
+    "note": "Biên bản nhắc 'gửi email khách hàng' nhưng GenAI không tạo task đó, vẫn ghi quan hệ A → C -> mã C không tồn tại",
+    "input": "Họp release 3.1:\nTech writer viết changelog. DevOps build bản release.\nBuild xong mới viết changelog. Sau khi viết changelog thì gửi email khách hàng.",
+    "expect_can_order": false,
+    "llm_output": {
+      "tasks": [
+        {
+          "id": "A",
+          "title": "Viết changelog",
+          "owner": "Tech writer"
+        },
+        {
+          "id": "B",
+          "title": "Build bản release",
+          "owner": "DevOps"
+        }
+      ],
+      "dependencies": [
+        {
+          "before": "B",
+          "after": "A",
+          "evidence": "Build xong mới viết changelog"
+        },
+        {
+          "before": "A",
+          "after": "C",
+          "evidence": "Sau khi viết changelog thì gửi email khách hàng"
+        }
+      ]
+    }
+  },
+  {
+    "label": "Mẫu 8 - [Lỗi] Việc tự chờ chính nó",
+    "note": "GenAI gộp 2 việc thành 1 task rồi ghi quan hệ A → A -> bị chặn",
+    "input": "Họp hiệu năng:\nBackend đo hiệu năng trang tìm kiếm. Tối ưu truy vấn chỉ làm sau khi đo hiệu năng.\nQA kiểm tra lại tốc độ sau khi tối ưu.",
+    "expect_can_order": false,
+    "llm_output": {
+      "tasks": [
+        {
+          "id": "A",
+          "title": "Đo hiệu năng và tối ưu truy vấn",
+          "owner": "Backend"
+        },
+        {
+          "id": "B",
+          "title": "Kiểm tra lại tốc độ",
+          "owner": "QA"
+        }
+      ],
+      "dependencies": [
+        {
+          "before": "A",
+          "after": "A",
+          "evidence": "Tối ưu truy vấn chỉ làm sau khi đo hiệu năng"
+        },
+        {
+          "before": "A",
+          "after": "B",
+          "evidence": "QA kiểm tra lại tốc độ sau khi tối ưu"
+        }
+      ]
+    }
+  },
+  {
+    "label": "Mẫu 9 - [Lỗi] Hai việc cùng mã",
+    "note": "GenAI đặt mã B cho cả 'Viết API' và 'Viết tài liệu API' -> quan hệ có B không biết chỉ việc nào",
+    "input": "Họp sprint 12:\nAn thiết kế database. Bình viết API đơn hàng sau khi có database. Chi viết tài liệu API khi API xong.",
+    "expect_can_order": false,
+    "llm_output": {
+      "tasks": [
+        {
+          "id": "A",
+          "title": "Thiết kế database",
+          "owner": "An"
+        },
+        {
+          "id": "B",
+          "title": "Viết API đơn hàng",
+          "owner": "Bình"
+        },
+        {
+          "id": "B",
+          "title": "Viết tài liệu API",
+          "owner": "Chi"
+        }
+      ],
+      "dependencies": [
+        {
+          "before": "A",
+          "after": "B",
+          "evidence": "Bình viết API đơn hàng sau khi có database"
+        },
+        {
+          "before": "B",
+          "after": "B",
+          "evidence": "Chi viết tài liệu API khi API xong"
+        }
+      ]
+    }
+  },
+  {
+    "label": "Mẫu 10 - GenAI tự thêm quan hệ",
+    "note": "Biên bản nói 2 việc làm song song, GenAI vẫn thêm quan hệ với câu không có trong biên bản -> cảnh báo, người dùng nên xóa",
+    "input": "Họp chuẩn bị sự kiện:\nDesign làm logo mới cho sự kiện. Marketing in tờ rơi. Hai việc làm song song.",
+    "expect_can_order": true,
+    "llm_output": {
+      "tasks": [
+        {
+          "id": "A",
+          "title": "Làm logo mới cho sự kiện",
+          "owner": "Design"
+        },
+        {
+          "id": "B",
+          "title": "In tờ rơi",
+          "owner": "Marketing"
+        }
+      ],
+      "dependencies": [
+        {
+          "before": "A",
+          "after": "B",
+          "evidence": "Logo phải xong trước khi in tờ rơi"
+        }
+      ]
+    }
+  }
+]
