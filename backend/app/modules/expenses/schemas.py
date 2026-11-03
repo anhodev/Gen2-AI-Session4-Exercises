@@ -12,9 +12,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from app.core.schemas import Issue
 
-# Loại tiền app hỗ trợ và số chữ số lẻ của đơn vị nhỏ nhất:
-# VND không có số lẻ (1 đồng), USD có 2 (1 cent = 0,01 USD).
-MINOR_DIGITS = {"VND": 0, "USD": 2}
+from .algo import MINOR_DIGITS  # noqa: F401  (loại tiền hỗ trợ, khai báo một chỗ trong algo.py)
 
 # Chỉ những ô này được phép ghi vào missing_fields
 MissingField = Literal["vendor", "invoice_number", "transaction_date", "amount_minor", "currency", "receipt_id"]
